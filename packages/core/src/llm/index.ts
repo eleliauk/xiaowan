@@ -13,7 +13,7 @@ import {
   type ToolPlanningDecision,
   ToolPlanningDecisionSchema,
   type UserGoal
-} from "@mh/shared";
+} from "@mh/core/shared";
 import OpenAI from "openai";
 import { z } from "zod";
 

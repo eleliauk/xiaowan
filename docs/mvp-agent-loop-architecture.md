@@ -32,7 +32,7 @@ The frontend submits all planning, revision, and confirmation turns to `/api/cha
 | `RunManager` | Run id, client run id reuse, status, abort, terminal error |
 | `StreamBridge` | Ordered event publication, retained event replay, stream close |
 | `LocalActivityAgent` | Model loop, tool calls, plan safety, confirmation/execution branching |
-| `@mh/tools` registry | Typed mock data boundary and execution tool validation |
+| `@mh/core/tools` registry | Typed mock data boundary and execution tool validation |
 
 ## Agent Runner
 
@@ -84,8 +84,7 @@ Duplicate `clientRunId` values reuse retained run events, and execution tools sk
 
 The following older surfaces are intentionally gone:
 
-- `@mh/agent` exports for `runPlanning()` and `executePlan()`
+- `@mh/core/agent` exports for `runPlanning()` and `executePlan()`
 - LangGraph wrapper files and old explicit planning nodes
 - Legacy `/api/plan` and `/api/execute` routes
 - Old docs that presented plan/execute as the primary architecture
-

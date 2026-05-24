@@ -46,3 +46,4 @@
 - [ ] 6.4 Add `/api/chat` SSE tests for cancellation, failure, and terminal event ordering.
 - [x] 6.5 Run `pnpm test`, `pnpm check`, and `openspec validate align-agent-runtime-with-deerflow`.
 - [x] 6.6 Add runtime and stream tests for skipped tool calls, loop-limit fallback, cancellation terminal events, and display metadata.
+- [x] 6.7 Add ordering coverage for `plan.updated -> artifact.updated -> confirmation.required -> run.completed` and final artifact updates after receipts.

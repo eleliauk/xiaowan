@@ -101,6 +101,17 @@ export const PlanSchema = z.object({
 });
 export type Plan = z.infer<typeof PlanSchema>;
 
+export const AgentArtifactSchema = z.object({
+  id: z.string(),
+  kind: z.literal("markdown"),
+  title: z.string(),
+  content: z.string(),
+  status: z.enum(["draft", "final"]),
+  sourcePlanId: z.string().optional(),
+  updatedAt: z.string()
+});
+export type AgentArtifact = z.infer<typeof AgentArtifactSchema>;
+
 export const ToolErrorSchema = z.object({
   code: z.enum([
     "NO_AVAILABILITY",
@@ -264,6 +275,10 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
   AgentStreamEventBaseSchema.extend({
     type: z.literal("plan.updated"),
     plan: PlanSchema
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("artifact.updated"),
+    artifact: AgentArtifactSchema
   }),
   AgentStreamEventBaseSchema.extend({
     type: z.literal("confirmation.required"),

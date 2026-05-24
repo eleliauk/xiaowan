@@ -11,7 +11,7 @@ The refactor is now applied. The project keeps DeerFlow's useful boundary model 
 - `LocalActivityRuntime` owns thread/run orchestration.
 - `ThreadStore`, `RunManager`, and `StreamBridge` isolate state, idempotency, cancellation, and ordered event delivery.
 - `LocalActivityAgent.streamTurn()` owns model turns, tool calls, confirmation branching, and execution.
-- The old LangGraph wrapper and explicit planning nodes were removed from `@mh/agent`.
+- The old LangGraph wrapper and explicit planning nodes were removed from `@mh/core/agent`.
 
 ## Current Runtime
 
@@ -45,4 +45,3 @@ Runtime producer
 - Do not re-add the old explicit node chain unless the runtime genuinely moves back to a graph.
 - Do not expose raw tool JSON as the primary UI.
 - Do not let model text create execution receipts; receipts come only from execution tool outputs.
-

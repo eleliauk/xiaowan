@@ -1,4 +1,4 @@
-import type { AgentStreamEvent, Plan } from "@mh/shared";
+import type { AgentStreamEvent, Plan } from "@mh/core/shared";
 import { describe, expect, it } from "vitest";
 import {
   createInMemoryRunManager,

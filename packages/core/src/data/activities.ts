@@ -1,4 +1,4 @@
-import type { Activity } from "@mh/shared";
+import type { Activity } from "@mh/core/shared";
 import { homeLocation } from "./userProfiles";
 
 const near = (label: string, latDelta: number, lngDelta: number) => ({

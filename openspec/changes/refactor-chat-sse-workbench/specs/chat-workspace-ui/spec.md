@@ -57,15 +57,20 @@ The system SHALL render planning and tool progress as compact assistant activity
 - **WHEN** the execution step block renders
 - **THEN** it shows the display title, summary, and compact display items rather than raw JSON input or output
 
-#### Scenario: Plan appears in the artifact panel
-- **GIVEN** the agent emits `plan.updated`
+#### Scenario: Markdown plan document appears in the artifact panel
+- **GIVEN** the agent emits `artifact.updated` for a markdown plan document
 - **WHEN** the workspace renders
-- **THEN** the right artifact panel opens to the plan view with timeline, budget, confidence, risks, and candidate rationale
+- **THEN** the right artifact panel opens to the document view and renders the markdown content instead of showing raw tool JSON or only a structured timeline card
+
+#### Scenario: Structured plan card is a fallback
+- **GIVEN** the agent emits `plan.updated` but no markdown artifact is available
+- **WHEN** the workspace renders the artifact panel
+- **THEN** it may show the structured timeline, budget, confidence, risks, and candidate rationale as a fallback
 
 #### Scenario: Confirmation appears in the artifact panel
 - **GIVEN** the agent emits a confirmation request
 - **WHEN** the assistant turn renders
-- **THEN** the artifact panel shows the pending actions and confirm/revise affordances while the chat shows a compact link to the artifact
+- **THEN** the document panel remains selected when a markdown artifact exists and shows confirm/revise affordances alongside the pending actions
 
 #### Scenario: Receipts appear after execution
 - **GIVEN** the user confirms the plan and execution succeeds

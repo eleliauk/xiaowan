@@ -1,6 +1,6 @@
-import { createLLMClient, type NativeChatMessage, type NativeToolCall } from "@mh/llm";
-import { type Plan, PlanSchema, type ToolCallTrace } from "@mh/shared";
-import { createDefaultToolRegistry, toOpenAIToolDefinition } from "@mh/tools";
+import { createLLMClient, type NativeChatMessage, type NativeToolCall } from "@mh/core/llm";
+import { type Plan, PlanSchema, type ToolCallTrace } from "@mh/core/shared";
+import { createDefaultToolRegistry, toOpenAIToolDefinition } from "@mh/core/tools";
 import { z } from "zod";
 import { stableStringify, toolFinishedDisplay, toolStartedDisplay } from "../display";
 import { createId, message, tracedToolCall } from "../helpers";

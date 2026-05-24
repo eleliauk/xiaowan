@@ -1,6 +1,6 @@
 "use client";
 
-import { type AgentStreamEvent, AgentStreamEventSchema } from "@mh/shared";
+import { type AgentStreamEvent, AgentStreamEventSchema } from "@mh/core/shared";
 import {
   AlertTriangle,
   ArrowUp,
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
+import { Streamdown } from "streamdown";
 import { applyClientEvent, type ClientThread, createEmptyThread } from "../lib/chatState";
 import { Button } from "./ui/button";
 
@@ -69,10 +70,11 @@ function receiptLabel(type: string) {
   return labels[type] ?? type;
 }
 
-type ArtifactTab = "plan" | "confirmation" | "receipts" | "diagnostics";
+type ArtifactTab = "document" | "plan" | "confirmation" | "receipts" | "diagnostics";
 
 function artifactLabel(tab: ArtifactTab) {
   const labels: Record<ArtifactTab, string> = {
+    document: "文档",
     plan: "方案",
     confirmation: "确认",
     receipts: "回执",
@@ -103,7 +105,8 @@ function receiptStatusText(status: string) {
 
 function availableArtifactTabs(thread: ClientThread): ArtifactTab[] {
   return [
-    thread.plan ? "plan" : undefined,
+    thread.artifacts.length > 0 ? "document" : undefined,
+    thread.plan && thread.artifacts.length === 0 ? "plan" : undefined,
     thread.confirmation ? "confirmation" : undefined,
     thread.receipts.length > 0 ? "receipts" : undefined,
     thread.failure || thread.steps.some((step) => step.status === "failed" || step.status === "skipped")
@@ -117,6 +120,10 @@ function selectedArtifact(thread: ClientThread): ArtifactTab | undefined {
   return tabs.includes(thread.artifactPanel.selected as ArtifactTab)
     ? (thread.artifactPanel.selected as ArtifactTab)
     : tabs[0];
+}
+
+function activeMarkdownArtifact(thread: ClientThread) {
+  return thread.artifacts.find((artifact) => artifact.id === thread.activeArtifactId) ?? thread.artifacts.at(-1);
 }
 
 function stepDetail(step: ClientThread["steps"][number]) {
@@ -199,11 +206,18 @@ function RunActivityPanel({
         <div className="artifact-inline">
           <div>
             <strong>
-              {thread.failure ? "本轮需要处理" : thread.receipts.length > 0 ? "执行结果已生成" : "方案产物已生成"}
+              {thread.failure
+                ? "本轮需要处理"
+                : thread.receipts.length > 0
+                  ? "执行结果已写入文档"
+                  : thread.artifacts.length > 0
+                    ? "方案文档已生成"
+                    : "方案产物已生成"}
             </strong>
             <span>
               {thread.failure?.summary ??
-                thread.confirmation?.summary ??
+                activeMarkdownArtifact(thread)?.title ??
+                (thread.confirmation ? "等待你确认后执行预约和通知。" : undefined) ??
                 thread.plan?.summary ??
                 `${thread.receipts.length} 个执行回执`}
             </span>
@@ -273,6 +287,40 @@ function ArtifactPanel({
       </div>
 
       <div className="artifact-panel-body">
+        {active === "document" && activeMarkdownArtifact(thread) && (
+          <section className="artifact-section document-section">
+            <div className="document-header">
+              <div>
+                <span className="artifact-kicker">
+                  {activeMarkdownArtifact(thread)?.status === "final" ? "最终文档" : "方案文档"}
+                </span>
+                <h3>{activeMarkdownArtifact(thread)?.title}</h3>
+              </div>
+              <strong>{activeMarkdownArtifact(thread)?.status === "final" ? "final" : "draft"}</strong>
+            </div>
+            {thread.confirmation && (
+              <div className="document-actions">
+                <div>
+                  <strong>等待确认</strong>
+                  <span>{thread.confirmation.summary}</span>
+                </div>
+                <div className="confirmation-actions compact">
+                  <Button type="button" onClick={onConfirm}>
+                    <Check size={16} />
+                    确认并安排
+                  </Button>
+                  <Button type="button" variant="outline" onClick={onRevise}>
+                    调整方案
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="markdown-document">
+              <Streamdown>{activeMarkdownArtifact(thread)?.content ?? ""}</Streamdown>
+            </div>
+          </section>
+        )}
+
         {active === "plan" && thread.plan && (
           <section className="artifact-section">
             <div className="plan-card-header">

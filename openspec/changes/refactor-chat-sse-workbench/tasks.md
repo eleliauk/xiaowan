@@ -56,3 +56,12 @@
 - [ ] 7.4 Browser-test the family prompt from new chat through confirmation and final receipts.
 - [ ] 7.5 Browser-test the four-friends prompt and verify the controlled no-availability repair path appears inline.
 - [ ] 7.6 Check desktop and narrow viewport screenshots for sidebar collapse, composer fit, no text overlap, and non-dominant Meituan accent use.
+
+## 8. Markdown Artifact Document
+
+- [x] 8.1 Add shared `AgentArtifact` schema and `artifact.updated` stream event with `display.artifactRef = "document"`.
+- [x] 8.2 Add deterministic plan/final Markdown artifact renderers that derive content from `Plan`, diagnostics, and execution receipts.
+- [x] 8.3 Emit `plan.updated -> artifact.updated -> confirmation.required` for planning runs and emit a final `artifact.updated` after execution receipts.
+- [x] 8.4 Add `streamdown` to the web app and render markdown artifacts as the default right-side document panel.
+- [x] 8.5 Update client state so `artifact.updated` opens/selects the document panel and confirmation no longer steals selection from an existing document.
+- [x] 8.6 Add shared, runtime, frontend state, and API tests for artifact parsing, event ordering, markdown content, and final receipt updates.

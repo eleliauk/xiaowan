@@ -1,4 +1,4 @@
-import type { Location } from "@mh/shared";
+import type { Location } from "@mh/core/shared";
 
 export function stableId(prefix: string, parts: Array<string | number>) {
   return `${prefix}-${parts.join("-").replace(/[^a-zA-Z0-9\u4e00-\u9fa5]+/g, "-")}`;

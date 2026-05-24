@@ -1,5 +1,5 @@
-import { activities, contacts, familyMembers, friendMembers, homeLocation, products, restaurants } from "@mh/data";
-import { type ExecutionReceipt, ExecutionReceiptSchema, LocationSchema } from "@mh/shared";
+import { activities, contacts, familyMembers, friendMembers, homeLocation, products, restaurants } from "@mh/core/data";
+import { type ExecutionReceipt, ExecutionReceiptSchema, LocationSchema } from "@mh/core/shared";
 import { z } from "zod";
 import { createAppTool } from "../registry";
 import { distanceKm, includesAny } from "./helpers";

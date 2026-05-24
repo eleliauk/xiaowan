@@ -1,5 +1,5 @@
-import type { AgentMessage, Plan, PlanAction, PlanStep, ToolCallTrace } from "@mh/shared";
-import { createDefaultToolRegistry, isToolExecutionError } from "@mh/tools";
+import type { AgentMessage, Plan, PlanAction, PlanStep, ToolCallTrace } from "@mh/core/shared";
+import { createDefaultToolRegistry, isToolExecutionError } from "@mh/core/tools";
 
 export function createId(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;

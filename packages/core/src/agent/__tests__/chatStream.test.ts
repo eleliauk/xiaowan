@@ -1,4 +1,4 @@
-import type { AgentStreamEvent, Plan } from "@mh/shared";
+import type { AgentStreamEvent, Plan } from "@mh/core/shared";
 import { describe, expect, it } from "vitest";
 import { runChatTurn } from "../index";
 import type { ThreadState } from "../runtime";
@@ -23,6 +23,10 @@ function planFrom(events: AgentStreamEvent[]): Plan {
   return event.plan;
 }
 
+function eventIndex(events: AgentStreamEvent[], type: AgentStreamEvent["type"]) {
+  return events.findIndex((event) => event.type === type);
+}
+
 function threadWithPlan(threadId: string, plan: Plan): ThreadState {
   return {
     threadId,
@@ -31,6 +35,7 @@ function threadWithPlan(threadId: string, plan: Plan): ThreadState {
     messages: [],
     events: [],
     toolTraces: [],
+    artifacts: [],
     plan,
     pendingConfirmation: {
       planId: plan.id,
@@ -52,8 +57,23 @@ describe("runChatTurn", () => {
 
     expect(events[0]?.type).toBe("thread.created");
     expect(events.some((event) => event.type === "plan.updated")).toBe(true);
+    expect(events.some((event) => event.type === "artifact.updated")).toBe(true);
     expect(events.some((event) => event.type === "confirmation.required")).toBe(true);
     expect(events.some((event) => event.type === "execution.receipt")).toBe(false);
+    expect(eventIndex(events, "plan.updated")).toBeLessThan(eventIndex(events, "artifact.updated"));
+    expect(eventIndex(events, "artifact.updated")).toBeLessThan(eventIndex(events, "confirmation.required"));
+    const artifact = events.find((event) => event.type === "artifact.updated");
+    expect(artifact).toMatchObject({
+      type: "artifact.updated",
+      artifact: {
+        kind: "markdown",
+        status: "draft",
+        content: expect.stringContaining("## 时间线")
+      },
+      display: {
+        artifactRef: "document"
+      }
+    });
     expect(events.at(-1)).toMatchObject({
       type: "run.completed",
       state: "READY_FOR_CONFIRMATION"
@@ -76,8 +96,17 @@ describe("runChatTurn", () => {
     });
 
     const receipts = events.filter((event) => event.type === "execution.receipt");
+    const finalArtifact = events.find((event) => event.type === "artifact.updated");
 
     expect(receipts.length).toBeGreaterThanOrEqual(3);
+    expect(finalArtifact).toMatchObject({
+      type: "artifact.updated",
+      artifact: {
+        status: "final",
+        content: expect.stringContaining("## 执行回执")
+      }
+    });
+    expect(eventIndex(events, "execution.receipt")).toBeLessThan(eventIndex(events, "artifact.updated"));
     expect(events.at(-1)).toMatchObject({
       type: "run.completed",
       state: "DONE"

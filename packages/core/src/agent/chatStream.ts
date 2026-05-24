@@ -1,6 +1,7 @@
-import type { LLMClient } from "@mh/llm";
-import type { AgentRunState, AgentStreamEvent, Plan } from "@mh/shared";
-import { AgentStreamEventSchema } from "@mh/shared";
+import type { LLMClient } from "@mh/core/llm";
+import type { AgentRunState, AgentStreamEvent, Plan } from "@mh/core/shared";
+import { AgentStreamEventSchema } from "@mh/core/shared";
+import { renderFinalMarkdownArtifact, renderPlanMarkdownArtifact } from "./artifacts";
 import { createId } from "./helpers";
 import { executeActions } from "./nodes/executeActions";
 import { runReActPlanning } from "./nodes/runReActPlanning";
@@ -173,11 +174,31 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
           ...updates
         };
         const runState = executionState(executedState);
+        const finalArtifact = executedState.selectedPlan
+          ? renderFinalMarkdownArtifact(executedState.selectedPlan, executedState.executionReceipts, {
+              updatedAt: input.now,
+              toolTraces: executedState.toolTraces
+            })
+          : undefined;
 
         /*
          * executeActions emits tool and receipt events through eventSink as each
          * action completes; the merged state is only used for terminal state.
          */
+        if (finalArtifact) {
+          queue.push({
+            ...streamContext,
+            type: "artifact.updated",
+            artifact: finalArtifact,
+            display: {
+              title: finalArtifact.title,
+              summary: `${executedState.executionReceipts.length} 个执行回执已写入文档。`,
+              severity: runState === "DONE" ? "success" : "warning",
+              artifactRef: "document"
+            }
+          });
+        }
+
         queue.push({
           ...streamContext,
           type: "agent.step",
@@ -297,6 +318,11 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
       }
 
       if (planned.selectedPlan) {
+        const planArtifact = renderPlanMarkdownArtifact(planned.selectedPlan, {
+          updatedAt: input.now,
+          toolTraces: planned.toolTraces
+        });
+
         queue.push({
           ...streamContext,
           type: "plan.updated",
@@ -311,6 +337,22 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
             ],
             severity: planned.selectedPlan.risks.some((risk) => risk.severity !== "info") ? "warning" : "success",
             artifactRef: "plan"
+          }
+        });
+
+        queue.push({
+          ...streamContext,
+          type: "artifact.updated",
+          artifact: planArtifact,
+          display: {
+            title: planArtifact.title,
+            summary: "已生成可确认的 Markdown 方案文档。",
+            items: [
+              { label: "状态", value: "draft" },
+              { label: "来源", value: planned.selectedPlan.id }
+            ],
+            severity: planned.selectedPlan.risks.some((risk) => risk.severity !== "info") ? "warning" : "success",
+            artifactRef: "document"
           }
         });
 

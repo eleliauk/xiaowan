@@ -1,4 +1,4 @@
-import type { AgentStreamEvent } from "@mh/shared";
+import type { AgentStreamEvent } from "@mh/core/shared";
 import { getAgentRuntime } from "../../../lib/agentRuntime";
 
 type ChatRequestBody = {

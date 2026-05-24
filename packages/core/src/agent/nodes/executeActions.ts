@@ -1,4 +1,4 @@
-import type { ExecutionReceipt, PlanAction } from "@mh/shared";
+import type { ExecutionReceipt, PlanAction } from "@mh/core/shared";
 import { toolFinishedDisplay, toolStartedDisplay } from "../display";
 import { createId, tracedToolCall } from "../helpers";
 import type { AgentRuntimeState } from "../state";

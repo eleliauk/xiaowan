@@ -1,4 +1,4 @@
-import type { Restaurant } from "@mh/shared";
+import type { Restaurant } from "@mh/core/shared";
 import { homeLocation } from "./userProfiles";
 
 const near = (label: string, latDelta: number, lngDelta: number) => ({

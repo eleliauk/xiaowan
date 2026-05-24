@@ -1,4 +1,4 @@
-import type { AgentEventDisplay, ToolCallTrace, ToolError } from "@mh/shared";
+import type { AgentEventDisplay, ToolCallTrace, ToolError } from "@mh/core/shared";
 
 type Display = NonNullable<AgentEventDisplay>;
 

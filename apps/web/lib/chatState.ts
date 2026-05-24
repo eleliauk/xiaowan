@@ -1,4 +1,5 @@
 import type {
+  AgentArtifact,
   AgentEventDisplay,
   AgentRunState,
   AgentStreamEvent,
@@ -6,7 +7,7 @@ import type {
   Plan,
   PlanAction,
   ToolError
-} from "@mh/shared";
+} from "@mh/core/shared";
 
 export type ClientMessage = {
   id: string;
@@ -36,7 +37,7 @@ export type ClientConfirmation = {
 
 export type ClientArtifactPanel = {
   open: boolean;
-  selected?: "plan" | "confirmation" | "receipts" | "diagnostics";
+  selected?: "document" | "plan" | "confirmation" | "receipts" | "diagnostics";
 };
 
 export type ClientFailure = {
@@ -54,6 +55,8 @@ export type ClientThread = {
   events: AgentStreamEvent[];
   steps: ClientStep[];
   plan?: Plan;
+  artifacts: AgentArtifact[];
+  activeArtifactId?: string;
   confirmation?: ClientConfirmation;
   receipts: ExecutionReceipt[];
   artifactPanel: ClientArtifactPanel;
@@ -69,6 +72,7 @@ export function createEmptyThread(id: string): ClientThread {
     messages: [],
     events: [],
     steps: [],
+    artifacts: [],
     receipts: [],
     artifactPanel: { open: false }
   };
@@ -136,6 +140,7 @@ function withArtifactPanel(thread: ClientThread, selected: NonNullable<ClientArt
 
 function artifactFromDisplay(display?: AgentEventDisplay): NonNullable<ClientArtifactPanel["selected"]> | undefined {
   if (
+    display?.artifactRef === "document" ||
     display?.artifactRef === "plan" ||
     display?.artifactRef === "confirmation" ||
     display?.artifactRef === "receipts" ||
@@ -145,6 +150,10 @@ function artifactFromDisplay(display?: AgentEventDisplay): NonNullable<ClientArt
   }
 
   return undefined;
+}
+
+function upsertArtifact(artifacts: AgentArtifact[], artifact: AgentArtifact) {
+  return [...artifacts.filter((item) => item.id !== artifact.id), artifact];
 }
 
 export function applyClientEvent(thread: ClientThread, event: AgentStreamEvent): ClientThread {
@@ -225,20 +234,29 @@ export function applyClientEvent(thread: ClientThread, event: AgentStreamEvent):
           ...next,
           plan: event.plan
         },
-        "plan"
+        next.artifacts.length > 0 ? "document" : "plan"
       );
-    case "confirmation.required":
+    case "artifact.updated":
       return withArtifactPanel(
         {
           ...next,
-          confirmation: {
-            planId: event.planId,
-            summary: event.summary,
-            actions: event.actions
-          }
+          artifacts: upsertArtifact(next.artifacts, event.artifact),
+          activeArtifactId: event.artifact.id,
+          confirmation: event.artifact.status === "final" ? undefined : next.confirmation
         },
-        "confirmation"
+        "document"
       );
+    case "confirmation.required":
+      return {
+        ...next,
+        confirmation: {
+          planId: event.planId,
+          summary: event.summary,
+          actions: event.actions
+        },
+        artifactPanel:
+          next.artifacts.length > 0 ? { open: true, selected: "document" } : { open: true, selected: "confirmation" }
+      };
     case "execution.receipt":
       return withArtifactPanel(
         {
@@ -250,7 +268,8 @@ export function applyClientEvent(thread: ClientThread, event: AgentStreamEvent):
     case "run.completed":
       return {
         ...next,
-        status: event.state
+        status: event.state,
+        confirmation: event.state === "DONE" ? undefined : next.confirmation
       };
     case "run.failed":
       return withArtifactPanel(

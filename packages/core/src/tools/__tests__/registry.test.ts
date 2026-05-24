@@ -1,4 +1,4 @@
-import { ExecutionReceiptSchema } from "@mh/shared";
+import { ExecutionReceiptSchema } from "@mh/core/shared";
 import { describe, expect, it } from "vitest";
 import { createDefaultToolRegistry, isToolExecutionError } from "../index";
 

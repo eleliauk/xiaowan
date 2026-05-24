@@ -9,7 +9,7 @@ import type {
   ToolCallingTurn,
   ToolPlanningInput,
   VerifyPlanInput
-} from "@mh/llm";
+} from "@mh/core/llm";
 import type {
   AgentStreamEvent,
   Plan,
@@ -17,7 +17,7 @@ import type {
   PlanValidationDecision,
   RepairDecision,
   ToolPlanningDecision
-} from "@mh/shared";
+} from "@mh/core/shared";
 import { describe, expect, it } from "vitest";
 import { runChatTurn } from "../index";
 

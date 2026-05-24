@@ -1,4 +1,4 @@
-import type { AgentRunOutput } from "@mh/shared";
+import type { AgentRunOutput } from "@mh/core/shared";
 import { getAgentRuntime } from "./agentRuntime";
 
 export function saveSession(session: AgentRunOutput) {

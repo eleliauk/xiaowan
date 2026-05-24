@@ -4,7 +4,7 @@ import {
   createInMemoryThreadStore,
   createLocalActivityRuntime,
   type LocalActivityRuntime
-} from "@mh/agent";
+} from "@mh/core/agent";
 
 function createRuntime() {
   return createLocalActivityRuntime({

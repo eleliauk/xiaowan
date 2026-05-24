@@ -1,4 +1,4 @@
-import type { Location, PartyMember } from "@mh/shared";
+import type { Location, PartyMember } from "@mh/core/shared";
 
 export const homeLocation: Location = {
   label: "小明家",

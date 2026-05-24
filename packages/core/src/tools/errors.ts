@@ -1,5 +1,5 @@
-import type { ToolError } from "@mh/shared";
-import { ToolErrorSchema } from "@mh/shared";
+import type { ToolError } from "@mh/core/shared";
+import { ToolErrorSchema } from "@mh/core/shared";
 import { ZodError } from "zod";
 
 export class ToolExecutionError extends Error implements ToolError {

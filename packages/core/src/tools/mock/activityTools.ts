@@ -1,5 +1,5 @@
-import { activities } from "@mh/data";
-import { type ExecutionReceipt, ExecutionReceiptSchema } from "@mh/shared";
+import { activities } from "@mh/core/data";
+import { type ExecutionReceipt, ExecutionReceiptSchema } from "@mh/core/shared";
 import { z } from "zod";
 import { ToolExecutionError } from "../errors";
 import { createAppTool } from "../registry";

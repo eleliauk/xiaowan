@@ -10,11 +10,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@mh/shared": new URL("./packages/shared/src/index.ts", import.meta.url).pathname,
-      "@mh/data": new URL("./packages/data/src/index.ts", import.meta.url).pathname,
-      "@mh/tools": new URL("./packages/tools/src/index.ts", import.meta.url).pathname,
-      "@mh/llm": new URL("./packages/llm/src/index.ts", import.meta.url).pathname,
-      "@mh/agent": new URL("./packages/agent/src/index.ts", import.meta.url).pathname
+      "@mh/core/agent": new URL("./packages/core/src/agent/index.ts", import.meta.url).pathname,
+      "@mh/core/llm": new URL("./packages/core/src/llm/index.ts", import.meta.url).pathname,
+      "@mh/core/tools": new URL("./packages/core/src/tools/index.ts", import.meta.url).pathname,
+      "@mh/core/data": new URL("./packages/core/src/data/index.ts", import.meta.url).pathname,
+      "@mh/core/shared": new URL("./packages/core/src/shared/index.ts", import.meta.url).pathname
     }
   }
 });

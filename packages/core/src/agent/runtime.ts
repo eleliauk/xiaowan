@@ -1,5 +1,6 @@
-import type { LLMClient } from "@mh/llm";
+import type { LLMClient } from "@mh/core/llm";
 import type {
+  AgentArtifact,
   AgentMessage,
   AgentRunOutput,
   AgentRunState,
@@ -9,7 +10,7 @@ import type {
   PlanAction,
   ToolCallTrace,
   ToolError
-} from "@mh/shared";
+} from "@mh/core/shared";
 import { runChatTurn } from "./chatStream";
 import { createId } from "./helpers";
 
@@ -27,6 +28,7 @@ export type ThreadState = {
   events: AgentStreamEvent[];
   toolTraces: ToolCallTrace[];
   plan?: Plan;
+  artifacts: AgentArtifact[];
   pendingConfirmation?: PendingConfirmation;
   needsUserInput?: {
     question: string;
@@ -45,6 +47,7 @@ export type ThreadStore = {
   appendMessage(threadId: string, message: AgentMessage): ThreadState;
   appendEvent(threadId: string, event: AgentStreamEvent): ThreadState;
   setPlan(threadId: string, plan: Plan): ThreadState;
+  setArtifact(threadId: string, artifact: AgentArtifact): ThreadState;
   setPendingConfirmation(threadId: string, confirmation: PendingConfirmation): ThreadState;
   clearPendingConfirmation(threadId: string): ThreadState;
   addReceipt(threadId: string, receipt: ExecutionReceipt): ThreadState;
@@ -119,6 +122,7 @@ function cloneThread(thread: ThreadState): ThreadState {
     messages: [...thread.messages],
     events: [...thread.events],
     toolTraces: [...thread.toolTraces],
+    artifacts: [...thread.artifacts],
     receipts: [...thread.receipts],
     pendingConfirmation: thread.pendingConfirmation
       ? { ...thread.pendingConfirmation, actions: [...thread.pendingConfirmation.actions] }
@@ -147,6 +151,7 @@ export function createInMemoryThreadStore(): ThreadStore {
         messages: [],
         events: [],
         toolTraces: [],
+        artifacts: [],
         receipts: [],
         createdAt: now,
         updatedAt: now
@@ -190,6 +195,17 @@ export function createInMemoryThreadStore(): ThreadStore {
     setPlan(threadId, plan) {
       const thread = requireThread(threads, threadId);
       const next = { ...thread, plan, updatedAt: thread.updatedAt };
+      threads.set(threadId, next);
+      return cloneThread(next);
+    },
+
+    setArtifact(threadId, artifact) {
+      const thread = requireThread(threads, threadId);
+      const next = {
+        ...thread,
+        artifacts: [...thread.artifacts.filter((item) => item.id !== artifact.id), artifact],
+        updatedAt: artifact.updatedAt
+      };
       threads.set(threadId, next);
       return cloneThread(next);
     },
@@ -480,6 +496,8 @@ export function applyEventToThreadStore(threadStore: ThreadStore, event: AgentSt
       return threadStore.saveThread(upsertToolFinished(thread, event));
     case "plan.updated":
       return threadStore.setPlan(event.threadId, event.plan);
+    case "artifact.updated":
+      return threadStore.setArtifact(event.threadId, event.artifact);
     case "confirmation.required":
       return threadStore.setPendingConfirmation(event.threadId, {
         planId: event.planId,
@@ -542,6 +560,7 @@ export function saveAgentRunOutputToThreadStore(
     messages: [...session.messages],
     toolTraces: [...session.toolTraces],
     plan: session.plan,
+    artifacts: existing.artifacts,
     pendingConfirmation,
     needsUserInput: session.needsUserInput,
     receipts: [...session.executionReceipts],

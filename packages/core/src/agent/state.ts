@@ -1,5 +1,5 @@
-import type { LLMClient } from "@mh/llm";
-import type { AgentMessage, AgentStreamEvent, ExecutionReceipt, Plan, ToolCallTrace, ToolError } from "@mh/shared";
+import type { LLMClient } from "@mh/core/llm";
+import type { AgentMessage, AgentStreamEvent, ExecutionReceipt, Plan, ToolCallTrace, ToolError } from "@mh/core/shared";
 
 export type AgentRuntimeState = {
   sessionId: string;

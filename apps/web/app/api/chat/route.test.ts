@@ -58,7 +58,15 @@ describe("POST /api/chat", () => {
 
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     expect(events[0]?.event).toBe("thread.created");
+    expect(events.some((item) => item.event === "artifact.updated")).toBe(true);
     expect(events.some((item) => item.event === "confirmation.required")).toBe(true);
+    expect(events.findIndex((item) => item.event === "plan.updated")).toBeLessThan(
+      events.findIndex((item) => item.event === "artifact.updated")
+    );
+    expect(events.findIndex((item) => item.event === "artifact.updated")).toBeLessThan(
+      events.findIndex((item) => item.event === "confirmation.required")
+    );
+    expect(events.find((item) => item.event === "artifact.updated")?.data.artifact.content).toContain("## 时间线");
     expect(events.at(-1)).toMatchObject({
       event: "run.completed",
       data: { state: "READY_FOR_CONFIRMATION" }
@@ -89,6 +97,17 @@ describe("POST /api/chat", () => {
     const confirmationEvents = await readEvents(confirmationResponse);
 
     expect(confirmationEvents.some((item) => item.event === "execution.receipt")).toBe(true);
+    expect(confirmationEvents.find((item) => item.event === "artifact.updated")).toMatchObject({
+      event: "artifact.updated",
+      data: {
+        artifact: {
+          status: "final"
+        }
+      }
+    });
+    expect(confirmationEvents.find((item) => item.event === "artifact.updated")?.data.artifact.content).toContain(
+      "## 执行回执"
+    );
     expect(confirmationEvents.at(-1)).toMatchObject({
       event: "run.completed",
       data: { state: "DONE" }

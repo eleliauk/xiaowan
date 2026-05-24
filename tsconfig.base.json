@@ -15,11 +15,11 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@mh/shared": ["packages/shared/src/index.ts"],
-      "@mh/data": ["packages/data/src/index.ts"],
-      "@mh/tools": ["packages/tools/src/index.ts"],
-      "@mh/llm": ["packages/llm/src/index.ts"],
-      "@mh/agent": ["packages/agent/src/index.ts"]
+      "@mh/core/agent": ["packages/core/src/agent/index.ts"],
+      "@mh/core/llm": ["packages/core/src/llm/index.ts"],
+      "@mh/core/tools": ["packages/core/src/tools/index.ts"],
+      "@mh/core/data": ["packages/core/src/data/index.ts"],
+      "@mh/core/shared": ["packages/core/src/shared/index.ts"]
     }
   }
 }

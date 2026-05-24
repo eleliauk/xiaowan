@@ -71,6 +71,39 @@ describe("AgentStreamEventSchema", () => {
     });
   });
 
+  it("parses markdown artifact update events with document display metadata", () => {
+    const parsed = AgentStreamEventSchema.parse({
+      ...base,
+      type: "artifact.updated",
+      artifact: {
+        id: "artifact_plan-family-steady",
+        kind: "markdown",
+        title: "轻松亲子半日",
+        content: "# 轻松亲子半日\n\n## 时间线\n\n| 时间 | 事项 |\n| --- | --- |",
+        status: "draft",
+        sourcePlanId: "plan-family-steady",
+        updatedAt: base.timestamp
+      },
+      display: {
+        title: "轻松亲子半日",
+        summary: "已生成可确认的 Markdown 方案文档。",
+        severity: "success",
+        artifactRef: "document"
+      }
+    });
+
+    expect(parsed).toMatchObject({
+      type: "artifact.updated",
+      artifact: {
+        kind: "markdown",
+        status: "draft"
+      },
+      display: {
+        artifactRef: "document"
+      }
+    });
+  });
+
   it("rejects unsupported event types", () => {
     const parsed = AgentStreamEventSchema.safeParse({
       ...base,

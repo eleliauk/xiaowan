@@ -1,4 +1,4 @@
-import type { AgentStreamEvent, Plan } from "@mh/shared";
+import type { AgentStreamEvent, Plan } from "@mh/core/shared";
 import { describe, expect, it } from "vitest";
 import { applyClientEvent, createEmptyThread } from "./chatState";
 
@@ -39,6 +39,25 @@ describe("chat client event state", () => {
       { ...base, type: "message.delta", messageId: "msg_1", role: "assistant", delta: "我先看下附近选择。" },
       { ...base, type: "message.completed", messageId: "msg_1", role: "assistant" },
       { ...base, type: "plan.updated", plan },
+      {
+        ...base,
+        type: "artifact.updated",
+        artifact: {
+          id: "artifact_plan-family-steady",
+          kind: "markdown",
+          title: plan.title,
+          content: "# 轻松亲子半日\n\n## 时间线\n\n| 时间 | 事项 |\n| --- | --- |",
+          status: "draft",
+          sourcePlanId: plan.id,
+          updatedAt: base.timestamp
+        },
+        display: {
+          title: plan.title,
+          summary: "已生成可确认的 Markdown 方案文档。",
+          artifactRef: "document",
+          severity: "success"
+        }
+      },
       { ...base, type: "confirmation.required", planId: plan.id, summary: plan.summary, actions: plan.requiredActions },
       { ...base, type: "run.completed", state: "READY_FOR_CONFIRMATION" }
     ];
@@ -50,6 +69,8 @@ describe("chat client event state", () => {
       expect.objectContaining({ id: "msg_1", role: "assistant", content: "我先看下附近选择。" })
     ]);
     expect(next.plan?.id).toBe("plan-family-steady");
+    expect(next.artifacts[0]?.content).toContain("## 时间线");
+    expect(next.artifactPanel).toMatchObject({ open: true, selected: "document" });
     expect(next.confirmation?.actions).toHaveLength(1);
     expect(next.status).toBe("READY_FOR_CONFIRMATION");
   });
@@ -135,6 +156,76 @@ describe("chat client event state", () => {
     expect(withPlan.artifactPanel).toMatchObject({
       open: true,
       selected: "plan"
+    });
+  });
+
+  it("keeps the markdown document selected when confirmation arrives", () => {
+    const withArtifact = applyClientEvent(createEmptyThread("thread_123"), {
+      ...base,
+      type: "artifact.updated",
+      artifact: {
+        id: "artifact_plan-family-steady",
+        kind: "markdown",
+        title: plan.title,
+        content: "# 轻松亲子半日\n\n## 待确认动作",
+        status: "draft",
+        sourcePlanId: plan.id,
+        updatedAt: base.timestamp
+      },
+      display: {
+        title: plan.title,
+        artifactRef: "document",
+        severity: "success"
+      }
+    });
+
+    const withConfirmation = applyClientEvent(withArtifact, {
+      ...base,
+      type: "confirmation.required",
+      planId: plan.id,
+      summary: plan.summary,
+      actions: plan.requiredActions
+    });
+
+    expect(withConfirmation.confirmation?.actions).toHaveLength(1);
+    expect(withConfirmation.artifactPanel).toMatchObject({
+      open: true,
+      selected: "document"
+    });
+  });
+
+  it("clears pending confirmation when the markdown document becomes final", () => {
+    const withConfirmation = applyClientEvent(createEmptyThread("thread_123"), {
+      ...base,
+      type: "confirmation.required",
+      planId: plan.id,
+      summary: plan.summary,
+      actions: plan.requiredActions
+    });
+
+    const withFinalArtifact = applyClientEvent(withConfirmation, {
+      ...base,
+      type: "artifact.updated",
+      artifact: {
+        id: "artifact_plan-family-steady",
+        kind: "markdown",
+        title: plan.title,
+        content: "# 轻松亲子半日\n\n## 执行回执",
+        status: "final",
+        sourcePlanId: plan.id,
+        updatedAt: base.timestamp
+      },
+      display: {
+        title: plan.title,
+        artifactRef: "document",
+        severity: "success"
+      }
+    });
+
+    expect(withFinalArtifact.confirmation).toBeUndefined();
+    expect(withFinalArtifact.artifactPanel).toMatchObject({
+      open: true,
+      selected: "document"
     });
   });
 });

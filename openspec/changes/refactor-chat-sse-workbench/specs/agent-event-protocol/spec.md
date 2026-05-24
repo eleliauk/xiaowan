@@ -62,6 +62,16 @@ The system SHALL emit structured plan and confirmation events that let the UI re
 - **WHEN** the current plan changes
 - **THEN** it emits `plan.updated` with plan id, title, summary, timeline, risks, and required actions
 
+#### Scenario: Markdown artifact is emitted after plan update
+- **GIVEN** the agent has emitted `plan.updated`
+- **WHEN** a user-facing plan document can be rendered from the structured plan
+- **THEN** it emits `artifact.updated` with a markdown artifact containing title, overview, timeline, suitability reasons, pending actions, and risks
+
+#### Scenario: Markdown artifact is updated after execution
+- **GIVEN** a confirmed plan has produced execution receipts
+- **WHEN** receipt events have been emitted
+- **THEN** it emits `artifact.updated` for the same artifact with `status: "final"` and an execution receipts section
+
 #### Scenario: Confirmation is required
 - **GIVEN** the plan is ready but bookings, reservations, delivery, or messages have not been executed
 - **WHEN** the agent needs user approval
