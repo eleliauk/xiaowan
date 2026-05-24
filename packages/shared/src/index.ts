@@ -121,12 +121,41 @@ export const ToolCallTraceSchema = z.object({
   toolName: z.string(),
   input: z.unknown(),
   output: z.unknown().optional(),
-  status: z.enum(["running", "succeeded", "failed"]),
+  status: z.enum(["running", "succeeded", "failed", "skipped"]),
   startedAt: z.string(),
   endedAt: z.string().optional(),
   error: ToolErrorSchema.optional()
 });
 export type ToolCallTrace = z.infer<typeof ToolCallTraceSchema>;
+
+export const PlannedToolCallSchema = z.object({
+  id: z.string(),
+  toolName: z.string(),
+  input: z.unknown(),
+  reason: z.string().optional()
+});
+export type PlannedToolCall = z.infer<typeof PlannedToolCallSchema>;
+
+export const ToolPlanningDecisionSchema = z.object({
+  calls: z.array(PlannedToolCallSchema),
+  rationaleSummary: z.string().optional()
+});
+export type ToolPlanningDecision = z.infer<typeof ToolPlanningDecisionSchema>;
+
+export const PlanValidationDecisionSchema = z.object({
+  isValid: z.boolean(),
+  blockingIssues: z.array(z.string()),
+  confidence: z.number().min(0).max(1),
+  reasonSummary: z.string().optional()
+});
+export type PlanValidationDecision = z.infer<typeof PlanValidationDecisionSchema>;
+
+export const RepairDecisionSchema = z.object({
+  plan: PlanSchema.optional(),
+  additionalToolCalls: z.array(PlannedToolCallSchema).default([]),
+  reasonSummary: z.string().optional()
+});
+export type RepairDecision = z.infer<typeof RepairDecisionSchema>;
 
 export const AgentMessageSchema = z.object({
   id: z.string(),
@@ -148,7 +177,8 @@ export const AgentRunOutputSchema = z.object({
       options: z.array(z.string()).optional()
     })
     .optional(),
-  executionReceipts: z.array(ExecutionReceiptSchema).default([])
+  executionReceipts: z.array(ExecutionReceiptSchema).default([]),
+  error: ToolErrorSchema.optional()
 });
 export type AgentRunOutput = z.infer<typeof AgentRunOutputSchema>;
 
@@ -158,8 +188,26 @@ export type AgentRunState = z.infer<typeof AgentRunStateSchema>;
 const AgentStreamEventBaseSchema = z.object({
   runId: z.string(),
   threadId: z.string(),
-  timestamp: z.string()
+  timestamp: z.string(),
+  display: z
+    .object({
+      title: z.string(),
+      summary: z.string().optional(),
+      items: z
+        .array(
+          z.object({
+            label: z.string(),
+            value: z.string(),
+            status: z.string().optional()
+          })
+        )
+        .optional(),
+      severity: z.enum(["info", "success", "warning", "error"]).optional(),
+      artifactRef: z.string().optional()
+    })
+    .optional()
 });
+export type AgentEventDisplay = z.infer<typeof AgentStreamEventBaseSchema>["display"];
 
 export const AgentStepPhaseSchema = z.enum([
   "intent",
@@ -209,7 +257,7 @@ export const AgentStreamEventSchema = z.discriminatedUnion("type", [
     type: z.literal("tool.finished"),
     toolCallId: z.string(),
     toolName: z.string(),
-    status: z.enum(["succeeded", "failed"]),
+    status: z.enum(["succeeded", "failed", "skipped"]),
     outputSummary: z.string().optional(),
     error: ToolErrorSchema.optional()
   }),

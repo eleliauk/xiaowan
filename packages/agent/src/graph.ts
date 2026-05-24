@@ -1,37 +1,19 @@
 import { END, START, StateGraph } from "@langchain/langgraph";
-import { routeAfterParseGoal, routeAfterVerify } from "./edges";
-import { callTools } from "./nodes/callTools";
-import { composePlan } from "./nodes/composePlan";
+import { routeAfterReActPlanning } from "./edges";
 import { executeActions } from "./nodes/executeActions";
-import { generateCandidates } from "./nodes/generateCandidates";
-import { parseGoal } from "./nodes/parseGoal";
-import { repairPlan } from "./nodes/repairPlan";
-import { verifyPlan } from "./nodes/verifyPlan";
+import { runReActPlanning } from "./nodes/runReActPlanning";
 import { waitForConfirmation } from "./nodes/waitForConfirmation";
 import { AgentGraphStateAnnotation } from "./state";
 
 export function createPlanningGraph() {
   return new StateGraph(AgentGraphStateAnnotation)
-    .addNode("parseGoal", parseGoal)
-    .addNode("generateCandidates", generateCandidates)
-    .addNode("callTools", callTools)
-    .addNode("composePlan", composePlan)
-    .addNode("verifyPlan", verifyPlan)
-    .addNode("repairPlan", repairPlan)
+    .addNode("runReActPlanning", runReActPlanning)
     .addNode("waitForConfirmation", waitForConfirmation)
-    .addEdge(START, "parseGoal")
-    .addConditionalEdges("parseGoal", routeAfterParseGoal, {
-      waitForUser: END,
-      generateCandidates: "generateCandidates"
+    .addEdge(START, "runReActPlanning")
+    .addConditionalEdges("runReActPlanning", routeAfterReActPlanning, {
+      end: END,
+      waitForConfirmation: "waitForConfirmation"
     })
-    .addEdge("generateCandidates", "callTools")
-    .addEdge("callTools", "composePlan")
-    .addEdge("composePlan", "verifyPlan")
-    .addConditionalEdges("verifyPlan", routeAfterVerify, {
-      waitForConfirmation: "waitForConfirmation",
-      repairPlan: "repairPlan"
-    })
-    .addEdge("repairPlan", "verifyPlan")
     .addEdge("waitForConfirmation", END)
     .compile();
 }

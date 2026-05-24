@@ -1,3 +1,5 @@
+import { createLLMClient } from "@mh/llm";
+import { createDefaultToolRegistry } from "@mh/tools";
 import type { AgentGraphState } from "../state";
 
 export async function generateCandidates(state: AgentGraphState): Promise<Partial<AgentGraphState>> {
@@ -5,21 +7,39 @@ export async function generateCandidates(state: AgentGraphState): Promise<Partia
     return {};
   }
 
-  return {
-    candidates: [
-      {
-        id: `${state.goal.scenario}-steady`,
-        title: state.goal.scenario === "family" ? "轻松亲子半日" : "展览 Citywalk 聚餐",
-        scenario: state.goal.scenario,
-        summary: "候选路线骨架，后续由工具校验可行性。",
-        totalDurationMinutes: 0,
-        estimatedBudgetCny: 0,
-        confidence: 0,
-        timeline: [],
-        requiredActions: [],
-        alternatives: [],
-        risks: []
+  const client = state.llmClient ?? createLLMClient();
+  const registry = createDefaultToolRegistry();
+
+  try {
+    const decision = await client.planToolCalls({
+      goal: state.goal,
+      toolTraces: state.toolTraces,
+      availableTools: registry.list().map((tool) => ({
+        name: tool.name,
+        description: tool.description
+      })),
+      now: state.now
+    });
+
+    return {
+      plannedToolCalls: decision.calls,
+      loopCount: state.loopCount + 1,
+      llmTrace: { provider: client.provider }
+    };
+  } catch (error) {
+    return {
+      error: {
+        code: "UNKNOWN",
+        message: error instanceof Error ? error.message : "LLM tool planning failed",
+        recoverable: false
+      },
+      llmTrace: {
+        provider: client.provider,
+        errorCode:
+          error && typeof error === "object" && "code" in error && typeof error.code === "string"
+            ? error.code
+            : "LLM_RUNTIME_ERROR"
       }
-    ]
-  };
+    };
+  }
 }

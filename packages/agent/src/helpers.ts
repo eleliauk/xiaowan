@@ -14,10 +14,15 @@ export function message(role: AgentMessage["role"], content: string, now: string
   };
 }
 
-export async function tracedToolCall(toolName: string, input: unknown, existing: ToolCallTrace[]) {
+export async function tracedToolCall(
+  toolName: string,
+  input: unknown,
+  existing: ToolCallTrace[],
+  requestedId?: string
+) {
   const registry = createDefaultToolRegistry();
   const startedAt = new Date().toISOString();
-  const id = createId("tool");
+  const id = requestedId ?? createId("tool");
 
   try {
     const output = await registry.get(toolName).invoke(input, { toolCallId: id, startedAt });

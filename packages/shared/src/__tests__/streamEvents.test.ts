@@ -44,6 +44,33 @@ describe("AgentStreamEventSchema", () => {
     expect(parsed.actions[0]?.toolName).toBe("reserveRestaurant");
   });
 
+  it("parses display metadata and skipped tool events", () => {
+    const parsed = AgentStreamEventSchema.parse({
+      ...base,
+      type: "tool.finished",
+      toolCallId: "tool_repeat",
+      toolName: "searchNearbyActivities",
+      status: "skipped",
+      outputSummary: "skipped duplicate call",
+      display: {
+        title: "跳过重复查询",
+        summary: "已查询过相同条件的附近活动。",
+        severity: "info",
+        artifactRef: "diagnostics",
+        items: [{ label: "工具", value: "searchNearbyActivities", status: "skipped" }]
+      }
+    });
+
+    expect(parsed).toMatchObject({
+      type: "tool.finished",
+      status: "skipped",
+      display: {
+        title: "跳过重复查询",
+        summary: "已查询过相同条件的附近活动。"
+      }
+    });
+  });
+
   it("rejects unsupported event types", () => {
     const parsed = AgentStreamEventSchema.safeParse({
       ...base,

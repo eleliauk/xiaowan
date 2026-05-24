@@ -1,4 +1,5 @@
-import type { AgentRunOutput, Plan } from "@mh/shared";
+import type { LLMClient } from "@mh/llm";
+import type { AgentRunOutput, AgentStreamEvent, Plan } from "@mh/shared";
 import { toExecutionResponse, toPlanningResponse } from "./adapters/toApiResponse";
 import { createExecutionGraph, createPlanningGraph } from "./graph";
 import { createId } from "./helpers";
@@ -8,12 +9,25 @@ export type RunPlanningInput = {
   sessionId?: string;
   userMessage: string;
   now: string;
+  llmClient?: LLMClient;
+  streamContext?: {
+    runId: string;
+    threadId: string;
+    timestamp: string;
+  };
+  eventSink?: (event: AgentStreamEvent) => void | Promise<void>;
 };
 
 export type ExecutePlanInput = {
   sessionId: string;
   plan: Plan;
   now: string;
+  streamContext?: {
+    runId: string;
+    threadId: string;
+    timestamp: string;
+  };
+  eventSink?: (event: AgentStreamEvent) => void | Promise<void>;
 };
 
 function baseState(input: RunPlanningInput): AgentGraphState {
@@ -22,10 +36,15 @@ function baseState(input: RunPlanningInput): AgentGraphState {
     mode: "plan_only",
     userMessage: input.userMessage,
     now: input.now,
+    streamContext: input.streamContext,
+    eventSink: input.eventSink,
+    llmClient: input.llmClient,
     candidates: [],
+    plannedToolCalls: [],
     messages: [],
     toolTraces: [],
     repairCount: 0,
+    loopCount: 0,
     executionReceipts: []
   };
 }
@@ -43,12 +62,16 @@ export async function executePlan(input: ExecutePlanInput): Promise<AgentRunOutp
     mode: "execute_confirmed_plan",
     userMessage: "",
     now: input.now,
+    streamContext: input.streamContext,
+    eventSink: input.eventSink,
     candidates: [],
+    plannedToolCalls: [],
     selectedPlan: input.plan,
     confirmedPlanId: input.plan.id,
     messages: [],
     toolTraces: [],
     repairCount: 0,
+    loopCount: 0,
     executionReceipts: []
   } satisfies AgentGraphState);
 
@@ -57,4 +80,5 @@ export async function executePlan(input: ExecutePlanInput): Promise<AgentRunOutp
 
 export * from "./chatStream";
 export * from "./graph";
+export * from "./runtime";
 export * from "./state";

@@ -1,46 +1,56 @@
+import { createLLMClient } from "@mh/llm";
 import type { AgentGraphState } from "../state";
 
 export async function verifyPlan(state: AgentGraphState): Promise<Partial<AgentGraphState>> {
-  if (!state.selectedPlan) {
+  if (state.error) {
+    return {};
+  }
+
+  if (!state.goal || !state.selectedPlan) {
     return {
       planValidation: {
         isValid: false,
         blockingIssues: ["No selected plan"],
-        confidence: 0
+        confidence: 0,
+        reasonSummary: "Missing plan"
       }
     };
   }
 
-  const meal = state.selectedPlan.timeline.find((step) => step.type === "meal");
-  const noAvailability = state.toolTraces.find(
-    (trace) =>
-      trace.toolName === "checkRestaurantAvailability" &&
-      trace.status === "failed" &&
-      trace.error?.code === "NO_AVAILABILITY" &&
-      JSON.stringify(trace.input).includes(`"time":"${meal?.startTime}"`)
-  );
+  const client = state.llmClient ?? createLLMClient();
 
-  if (noAvailability) {
+  try {
+    const validation = await client.verifyPlan({
+      goal: state.goal,
+      plan: state.selectedPlan,
+      toolTraces: state.toolTraces,
+      now: state.now
+    });
+
     return {
-      planValidation: {
-        isValid: false,
-        blockingIssues: [noAvailability.error?.message ?? "Restaurant unavailable"],
-        confidence: state.selectedPlan.confidence
+      planValidation: validation,
+      selectedPlan: validation.isValid
+        ? {
+            ...state.selectedPlan,
+            confidence: Math.max(state.selectedPlan.confidence, validation.confidence)
+          }
+        : state.selectedPlan,
+      llmTrace: { provider: client.provider }
+    };
+  } catch (error) {
+    return {
+      error: {
+        code: "UNKNOWN",
+        message: error instanceof Error ? error.message : "LLM plan verification failed",
+        recoverable: false
+      },
+      llmTrace: {
+        provider: client.provider,
+        errorCode:
+          error && typeof error === "object" && "code" in error && typeof error.code === "string"
+            ? error.code
+            : "LLM_RUNTIME_ERROR"
       }
     };
   }
-
-  const totalOk = state.selectedPlan.totalDurationMinutes >= 240 && state.selectedPlan.totalDurationMinutes <= 390;
-
-  return {
-    planValidation: {
-      isValid: totalOk,
-      blockingIssues: totalOk ? [] : ["Plan duration outside expected range"],
-      confidence: totalOk ? Math.max(state.selectedPlan.confidence, 0.82) : 0.5
-    },
-    selectedPlan: {
-      ...state.selectedPlan,
-      confidence: totalOk ? Math.max(state.selectedPlan.confidence, 0.82) : state.selectedPlan.confidence
-    }
-  };
 }

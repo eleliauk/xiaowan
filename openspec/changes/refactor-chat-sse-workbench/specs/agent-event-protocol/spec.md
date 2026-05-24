@@ -44,6 +44,16 @@ The system SHALL emit structured events for high-level agent steps and individua
 - **WHEN** the result is available
 - **THEN** it emits `tool.finished` with tool call id, status, compact output summary, and normalized error when applicable
 
+#### Scenario: Tool event includes display metadata
+- **GIVEN** the agent emits `agent.step`, `tool.started`, or `tool.finished`
+- **WHEN** the UI validates the event
+- **THEN** the event may include `display.title`, `display.summary`, `display.items`, `display.severity`, and `display.artifactRef` for user-facing rendering
+
+#### Scenario: Duplicate tool call is skipped
+- **GIVEN** the ReAct loop requests an exact duplicate planning tool call in the same run
+- **WHEN** the runtime guardrail detects the duplicate
+- **THEN** it emits `tool.finished` with `status: "skipped"` and display metadata explaining the skipped query
+
 ### Requirement: Represent itinerary artifacts and confirmation state
 The system SHALL emit structured plan and confirmation events that let the UI render executable local-activity arrangements inside chat.
 
@@ -79,3 +89,8 @@ The system SHALL emit execution receipts and terminal run events that make compl
 - **GIVEN** the agent cannot recover from a validation, tool, or runtime error
 - **WHEN** the failure is known
 - **THEN** it emits `run.failed` with normalized error code, message, and retryability
+
+#### Scenario: Loop limit produces fallback artifact when facts exist
+- **GIVEN** the ReAct loop reaches the maximum number of tool-calling turns after successful observations
+- **WHEN** the runtime can compose a partial local-activity plan from those observations
+- **THEN** it emits `plan.updated`, `confirmation.required`, and `run.completed` instead of only emitting `run.failed`

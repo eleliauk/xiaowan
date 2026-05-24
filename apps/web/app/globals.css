@@ -159,7 +159,7 @@ button:disabled {
 .chat-main {
   display: grid;
   min-width: 0;
-  grid-template-rows: 56px minmax(0, 1fr) auto;
+  grid-template-rows: 56px minmax(0, 1fr);
   height: 100vh;
 }
 
@@ -188,6 +188,23 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.workspace-content {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-content.with-artifact {
+  grid-template-columns: minmax(0, 64fr) minmax(340px, 36fr);
+}
+
+.chat-column {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .conversation {
@@ -283,7 +300,7 @@ button:disabled {
 
 .assistant-artifacts {
   display: grid;
-  width: min(100%, 760px);
+  width: min(100%, 700px);
   gap: 12px;
 }
 
@@ -313,6 +330,17 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.steps-card summary span b {
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .step-list {
@@ -320,6 +348,12 @@ button:disabled {
   gap: 2px;
   border-top: 1px solid var(--border);
   padding: 8px;
+}
+
+.step-hidden {
+  color: var(--muted-foreground);
+  padding: 7px 8px;
+  font-size: 12px;
 }
 
 .step-row {
@@ -343,10 +377,14 @@ button:disabled {
 
 .step-row p {
   margin: 3px 0 0;
-  overflow-wrap: anywhere;
+  display: -webkit-box;
+  overflow: hidden;
   color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.5;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .step-row em,
@@ -358,6 +396,131 @@ button:disabled {
 
 .step-row.failed em {
   color: var(--danger);
+}
+
+.step-row.skipped em {
+  color: var(--muted-foreground);
+}
+
+.step-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.step-pills span,
+.artifact-metrics span {
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.artifact-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--card) 80%, transparent);
+  padding: 11px 12px;
+}
+
+.artifact-inline div {
+  min-width: 0;
+}
+
+.artifact-inline strong,
+.artifact-inline span {
+  display: block;
+}
+
+.artifact-inline span {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.artifact-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  border-left: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 68%, var(--background));
+}
+
+.artifact-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 10px;
+}
+
+.artifact-panel-header h2 {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+
+.artifact-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px 12px;
+}
+
+.artifact-tabs button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.artifact-tabs button.selected,
+.artifact-tabs button:hover {
+  background: var(--foreground);
+  color: var(--primary-foreground);
+}
+
+.artifact-panel-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.artifact-section {
+  display: grid;
+  gap: 13px;
+}
+
+.artifact-section p {
+  margin: 0;
+  color: var(--muted-foreground);
+  line-height: 1.65;
+}
+
+.artifact-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.confirmation-section,
+.diagnostics-section {
+  align-content: start;
 }
 
 .plan-card,
@@ -468,6 +631,66 @@ button:disabled {
   margin-top: 2px;
   color: var(--muted-foreground);
   font-size: 12px;
+}
+
+.receipt-card small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.diagnostic-list {
+  display: grid;
+  gap: 8px;
+}
+
+.diagnostic-row {
+  display: grid;
+  gap: 3px;
+  border-left: 2px solid var(--border);
+  padding: 4px 0 4px 10px;
+}
+
+.diagnostic-row.failed {
+  border-left-color: var(--danger);
+}
+
+.diagnostic-row.skipped {
+  border-left-color: var(--muted-foreground);
+}
+
+.diagnostic-row strong {
+  font-size: 13px;
+}
+
+.diagnostic-row span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.raw-events {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.raw-events summary {
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.raw-events pre {
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--muted);
+  padding: 10px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .composer-wrap {
@@ -613,6 +836,17 @@ button:disabled {
 
   .conversation {
     padding: 20px 12px 12px;
+  }
+
+  .workspace-content,
+  .workspace-content.with-artifact {
+    grid-template-columns: 1fr;
+  }
+
+  .artifact-panel {
+    max-height: 42vh;
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
 
   .composer-wrap {

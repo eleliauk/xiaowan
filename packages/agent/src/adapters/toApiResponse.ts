@@ -4,12 +4,13 @@ import type { AgentGraphState } from "../state";
 export function toPlanningResponse(state: AgentGraphState): AgentRunOutput {
   return {
     sessionId: state.sessionId,
-    state: state.needsUserInput ? "WAITING_FOR_USER" : "READY_FOR_CONFIRMATION",
+    state: state.error ? "PARTIAL_FAILURE" : state.needsUserInput ? "WAITING_FOR_USER" : "READY_FOR_CONFIRMATION",
     messages: state.messages,
     plan: state.selectedPlan,
     toolTraces: state.toolTraces,
     needsUserInput: state.needsUserInput,
-    executionReceipts: []
+    executionReceipts: [],
+    error: state.error
   };
 }
 
@@ -23,6 +24,7 @@ export function toExecutionResponse(state: AgentGraphState): AgentRunOutput {
     messages: state.messages,
     plan: state.selectedPlan,
     toolTraces: state.toolTraces,
-    executionReceipts: state.executionReceipts
+    executionReceipts: state.executionReceipts,
+    error: state.error
   };
 }

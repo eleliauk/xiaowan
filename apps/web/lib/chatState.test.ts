@@ -95,4 +95,46 @@ describe("chat client event state", () => {
     expect(withReceipt.steps[0]).toMatchObject({ id: "tool_1", status: "succeeded" });
     expect(withReceipt.receipts[0]?.targetName).toBe("青禾轻食 Bistro");
   });
+
+  it("prefers display metadata for steps and opens the matching artifact panel", () => {
+    const thread = createEmptyThread("thread_123");
+    const withTool = applyClientEvent(thread, {
+      ...base,
+      type: "tool.finished",
+      toolCallId: "tool_profile",
+      toolName: "getUserProfile",
+      status: "succeeded",
+      outputSummary: '{"home":{"address":"望京 SOHO 附近"},"contacts":{"spouse":"老婆"}}',
+      display: {
+        title: "读取家庭画像",
+        summary: "家庭 3 人，偏好清淡少排队。",
+        severity: "success",
+        items: [
+          { label: "成员", value: "小明、老婆、孩子" },
+          { label: "偏好", value: "亲子、清淡、少排队" }
+        ]
+      }
+    });
+    const withPlan = applyClientEvent(withTool, {
+      ...base,
+      type: "plan.updated",
+      plan,
+      display: {
+        title: "方案已生成",
+        summary: plan.summary,
+        artifactRef: "plan",
+        severity: "success"
+      }
+    });
+
+    expect(withPlan.steps[0]).toMatchObject({
+      title: "读取家庭画像",
+      detail: "家庭 3 人，偏好清淡少排队。"
+    });
+    expect(withPlan.steps[0]?.outputSummary).toBeUndefined();
+    expect(withPlan.artifactPanel).toMatchObject({
+      open: true,
+      selected: "plan"
+    });
+  });
 });

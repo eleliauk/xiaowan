@@ -215,7 +215,26 @@ Rendering rules:
 - Duplicate `clientRunId` returns or replays the existing run state instead of double-booking.
 - Browser abort cancels the current stream. Confirmed execution steps must remain idempotent.
 
+## Updated Artifact Panel Decision
+
+The current SSE log rendered too much raw tool JSON in the main chat. The workspace now follows DeerFlow's separation more closely:
+
+- The chat column renders user/assistant messages plus a compact collapsible run activity block.
+- Tool events use `display` metadata for human labels, summaries, and compact key-value items; raw event payloads stay available only in diagnostics/debug details.
+- Plan, confirmation, receipts, and failure diagnostics open in a right-side artifact panel on desktop.
+- On narrow screens, the artifact panel stacks below the conversation instead of covering the composer.
+
+This replaces the earlier "initial UI can omit DeerFlow's artifact side panel" assumption.
+
+## Updated ReAct Runtime Decision
+
+The MVP still keeps the native tool-calling ReAct loop, but the loop now has guardrails:
+
+- Exact duplicate tool calls are skipped and emitted as `tool.finished` with `status: "skipped"`.
+- Tool events carry display metadata so the frontend never needs to infer labels from raw JSON.
+- When the ReAct loop reaches its turn limit with useful observations, the runtime composes a partial fallback plan instead of ending with only a partial-failure message.
+- `agent.step` events mark intent, planning, tooling, verification, repair, confirmation, execution, and finalization boundaries.
+
 ## Open Questions
 
 - Persistence can remain in-memory for hackathon MVP, but the thread API should be shaped so SQLite or LangGraph checkpoints can be added later.
-- The initial UI can omit DeerFlow's artifact side panel. If final receipts or route maps become too rich, add a right artifact panel after the chat workspace is stable.

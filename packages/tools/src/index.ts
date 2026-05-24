@@ -13,6 +13,7 @@ import { ToolRegistry } from "./registry";
 
 export * from "./errors";
 export * from "./langchainTools";
+export * from "./openAITools";
 export * from "./registry";
 
 export function createDefaultToolRegistry() {

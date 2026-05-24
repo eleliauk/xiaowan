@@ -1,4 +1,12 @@
-import type { AgentRunState, AgentStreamEvent, ExecutionReceipt, Plan, PlanAction, ToolError } from "@mh/shared";
+import type {
+  AgentEventDisplay,
+  AgentRunState,
+  AgentStreamEvent,
+  ExecutionReceipt,
+  Plan,
+  PlanAction,
+  ToolError
+} from "@mh/shared";
 
 export type ClientMessage = {
   id: string;
@@ -14,6 +22,7 @@ export type ClientStep = {
   title: string;
   status: "running" | "succeeded" | "failed" | "skipped";
   detail?: string;
+  display?: AgentEventDisplay;
   inputSummary?: string;
   outputSummary?: string;
   error?: ToolError;
@@ -23,6 +32,18 @@ export type ClientConfirmation = {
   planId: string;
   summary: string;
   actions: PlanAction[];
+};
+
+export type ClientArtifactPanel = {
+  open: boolean;
+  selected?: "plan" | "confirmation" | "receipts" | "diagnostics";
+};
+
+export type ClientFailure = {
+  title: string;
+  summary: string;
+  error: ToolError;
+  display?: AgentEventDisplay;
 };
 
 export type ClientThread = {
@@ -35,6 +56,8 @@ export type ClientThread = {
   plan?: Plan;
   confirmation?: ClientConfirmation;
   receipts: ExecutionReceipt[];
+  artifactPanel: ClientArtifactPanel;
+  failure?: ClientFailure;
   error?: ToolError;
 };
 
@@ -46,7 +69,8 @@ export function createEmptyThread(id: string): ClientThread {
     messages: [],
     events: [],
     steps: [],
-    receipts: []
+    receipts: [],
+    artifactPanel: { open: false }
   };
 }
 
@@ -100,6 +124,32 @@ function upsertStep(steps: ClientStep[], step: ClientStep) {
   return steps.map((item) => (item.id === step.id ? { ...item, ...step } : item));
 }
 
+function withArtifactPanel(
+  thread: ClientThread,
+  selected: NonNullable<ClientArtifactPanel["selected"]>
+): ClientThread {
+  return {
+    ...thread,
+    artifactPanel: {
+      open: true,
+      selected
+    }
+  };
+}
+
+function artifactFromDisplay(display?: AgentEventDisplay): NonNullable<ClientArtifactPanel["selected"]> | undefined {
+  if (
+    display?.artifactRef === "plan" ||
+    display?.artifactRef === "confirmation" ||
+    display?.artifactRef === "receipts" ||
+    display?.artifactRef === "diagnostics"
+  ) {
+    return display.artifactRef;
+  }
+
+  return undefined;
+}
+
 export function applyClientEvent(thread: ClientThread, event: AgentStreamEvent): ClientThread {
   const next = {
     ...thread,
@@ -136,9 +186,10 @@ export function applyClientEvent(thread: ClientThread, event: AgentStreamEvent):
         steps: upsertStep(next.steps, {
           id: `${event.runId}:${event.phase}:${event.title}`,
           kind: "agent",
-          title: event.title,
+          title: event.display?.title ?? event.title,
           status: event.status,
-          detail: event.detail
+          detail: event.display?.summary ?? event.detail,
+          display: event.display
         })
       };
     case "tool.started":
@@ -147,9 +198,11 @@ export function applyClientEvent(thread: ClientThread, event: AgentStreamEvent):
         steps: upsertStep(next.steps, {
           id: event.toolCallId,
           kind: "tool",
-          title: event.toolName,
+          title: event.display?.title ?? event.toolName,
           status: "running",
-          inputSummary: event.inputSummary
+          detail: event.display?.summary,
+          display: event.display,
+          inputSummary: event.display ? undefined : event.inputSummary
         })
       };
     case "tool.finished":
@@ -158,42 +211,65 @@ export function applyClientEvent(thread: ClientThread, event: AgentStreamEvent):
         steps: upsertStep(next.steps, {
           id: event.toolCallId,
           kind: "tool",
-          title: event.toolName,
+          title: event.display?.title ?? event.toolName,
           status: event.status,
-          outputSummary: event.outputSummary,
+          detail: event.display?.summary,
+          display: event.display,
+          outputSummary: event.display ? undefined : event.outputSummary,
           error: event.error
-        })
+        }),
+        artifactPanel: artifactFromDisplay(event.display)
+          ? { open: true, selected: artifactFromDisplay(event.display) }
+          : next.artifactPanel
       };
     case "plan.updated":
-      return {
-        ...next,
-        plan: event.plan
-      };
+      return withArtifactPanel(
+        {
+          ...next,
+          plan: event.plan
+        },
+        "plan"
+      );
     case "confirmation.required":
-      return {
-        ...next,
-        confirmation: {
-          planId: event.planId,
-          summary: event.summary,
-          actions: event.actions
-        }
-      };
+      return withArtifactPanel(
+        {
+          ...next,
+          confirmation: {
+            planId: event.planId,
+            summary: event.summary,
+            actions: event.actions
+          }
+        },
+        "confirmation"
+      );
     case "execution.receipt":
-      return {
-        ...next,
-        receipts: [...next.receipts, event.receipt]
-      };
+      return withArtifactPanel(
+        {
+          ...next,
+          receipts: [...next.receipts, event.receipt]
+        },
+        "receipts"
+      );
     case "run.completed":
       return {
         ...next,
         status: event.state
       };
     case "run.failed":
-      return {
-        ...next,
-        status: "PARTIAL_FAILURE",
-        error: event.error
-      };
+      return withArtifactPanel(
+        {
+          ...next,
+          status: "PARTIAL_FAILURE",
+          error: event.error,
+          failure: {
+            title: event.display?.title ?? "运行失败",
+            summary: event.display?.summary ?? event.error.message,
+            error: event.error,
+            display: event.display
+          }
+        },
+        "diagnostics"
+      );
     default:
       return next;
   }

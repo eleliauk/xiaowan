@@ -1,12 +1,10 @@
 import type { AgentRunOutput } from "@mh/shared";
-
-const sessions = new Map<string, AgentRunOutput>();
+import { getAgentRuntime } from "./agentRuntime";
 
 export function saveSession(session: AgentRunOutput) {
-  sessions.set(session.sessionId, session);
-  return session;
+  return getAgentRuntime().saveSession(session);
 }
 
 export function getSession(sessionId: string) {
-  return sessions.get(sessionId);
+  return getAgentRuntime().getSession(sessionId);
 }

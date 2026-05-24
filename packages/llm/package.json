@@ -12,7 +12,10 @@
     "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
-    "@langchain/openai": "^1.1.2"
+    "@langchain/openai": "^1.1.2",
+    "@mh/shared": "workspace:*",
+    "openai": "^6.39.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

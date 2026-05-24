@@ -3,6 +3,8 @@ import { executePlan, runPlanning } from "../index";
 
 const now = "2026-05-24T12:00:00+08:00";
 
+process.env.LLM_PROVIDER = "fake";
+
 describe("activity planning agent", () => {
   it("plans a family afternoon without executing actions before confirmation", async () => {
     const result = await runPlanning({

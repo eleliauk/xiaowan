@@ -44,23 +44,38 @@ The system SHALL use warm low-chroma neutral background, sidebar, border, input,
 - **WHEN** the page is visually inspected
 - **THEN** Meituan yellow is limited to status, receipt, or confirmation accents and does not dominate the app background or message layout
 
-### Requirement: Render agent activity inline in the conversation
-The system SHALL render planning steps, tool calls, plan updates, confirmations, receipts, and failures inside assistant turns rather than in separate dashboard panels.
+### Requirement: Render agent activity in a DeerFlow-style workspace
+The system SHALL render planning and tool progress as compact assistant activity, while richer plan, confirmation, receipt, and failure artifacts live in a workspace artifact panel.
 
 #### Scenario: Tool calls appear in a collapsible assistant block
 - **GIVEN** the agent emits tool events while planning
 - **WHEN** the message list renders the assistant turn
 - **THEN** the tool calls appear inside a collapsible inline block labeled as execution steps
 
-#### Scenario: Confirmation appears in chat
+#### Scenario: Tool calls use display metadata
+- **GIVEN** a tool event includes `display` metadata
+- **WHEN** the execution step block renders
+- **THEN** it shows the display title, summary, and compact display items rather than raw JSON input or output
+
+#### Scenario: Plan appears in the artifact panel
+- **GIVEN** the agent emits `plan.updated`
+- **WHEN** the workspace renders
+- **THEN** the right artifact panel opens to the plan view with timeline, budget, confidence, risks, and candidate rationale
+
+#### Scenario: Confirmation appears in the artifact panel
 - **GIVEN** the agent emits a confirmation request
 - **WHEN** the assistant turn renders
-- **THEN** the proposed itinerary and confirm/revise affordances appear as a chat-native card in the conversation
+- **THEN** the artifact panel shows the pending actions and confirm/revise affordances while the chat shows a compact link to the artifact
 
 #### Scenario: Receipts appear after execution
 - **GIVEN** the user confirms the plan and execution succeeds
 - **WHEN** the agent emits receipt events
-- **THEN** the receipts appear in the same conversation thread with target name, action type, scheduled time, and status
+- **THEN** the receipt artifact view shows target name, action type, scheduled time, receipt id, and status
+
+#### Scenario: Failure diagnostics are separated from normal chat
+- **GIVEN** the run emits failed or skipped tool events or `run.failed`
+- **WHEN** the workspace renders diagnostics
+- **THEN** the artifact panel shows concise failure and fallback details, with raw events hidden behind a debug-only disclosure
 
 ### Requirement: Preserve demo prompt shortcuts
 The system SHALL keep quick access to the required family and friends scenarios without turning them into separate workflow controls.
