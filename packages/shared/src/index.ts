@@ -156,6 +156,98 @@ export const AgentRunOutputSchema = z.object({
 });
 export type AgentRunOutput = z.infer<typeof AgentRunOutputSchema>;
 
+export const AgentRunStateSchema = z.enum([
+  "WAITING_FOR_USER",
+  "READY_FOR_CONFIRMATION",
+  "DONE",
+  "PARTIAL_FAILURE"
+]);
+export type AgentRunState = z.infer<typeof AgentRunStateSchema>;
+
+const AgentStreamEventBaseSchema = z.object({
+  runId: z.string(),
+  threadId: z.string(),
+  timestamp: z.string()
+});
+
+export const AgentStepPhaseSchema = z.enum([
+  "intent",
+  "planning",
+  "tooling",
+  "verification",
+  "repair",
+  "confirmation",
+  "execution",
+  "final"
+]);
+export type AgentStepPhase = z.infer<typeof AgentStepPhaseSchema>;
+
+export const AgentStepStatusSchema = z.enum(["running", "succeeded", "failed", "skipped"]);
+export type AgentStepStatus = z.infer<typeof AgentStepStatusSchema>;
+
+export const AgentStreamEventSchema = z.discriminatedUnion("type", [
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("thread.created"),
+    title: z.string().optional()
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("message.delta"),
+    messageId: z.string(),
+    role: z.enum(["assistant", "user"]),
+    delta: z.string()
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("message.completed"),
+    messageId: z.string(),
+    role: z.enum(["assistant", "user"])
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("agent.step"),
+    phase: AgentStepPhaseSchema,
+    title: z.string(),
+    status: AgentStepStatusSchema,
+    detail: z.string().optional()
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("tool.started"),
+    toolCallId: z.string(),
+    toolName: z.string(),
+    inputSummary: z.string()
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("tool.finished"),
+    toolCallId: z.string(),
+    toolName: z.string(),
+    status: z.enum(["succeeded", "failed"]),
+    outputSummary: z.string().optional(),
+    error: ToolErrorSchema.optional()
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("plan.updated"),
+    plan: PlanSchema
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("confirmation.required"),
+    planId: z.string(),
+    summary: z.string(),
+    actions: z.array(PlanActionSchema)
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("execution.receipt"),
+    receipt: ExecutionReceiptSchema
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("run.completed"),
+    state: AgentRunStateSchema
+  }),
+  AgentStreamEventBaseSchema.extend({
+    type: z.literal("run.failed"),
+    error: ToolErrorSchema,
+    retryable: z.boolean()
+  })
+]);
+export type AgentStreamEvent = z.infer<typeof AgentStreamEventSchema>;
+
 export type Activity = {
   id: string;
   name: string;
