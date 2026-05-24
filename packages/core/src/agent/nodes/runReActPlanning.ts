@@ -130,7 +130,9 @@ function valueText(value: unknown): string | undefined {
 }
 
 function firstOutputItem(traces: ToolCallTrace[], toolName: string) {
-  const trace = traces.find((item) => item.toolName === toolName && item.status === "succeeded");
+  const trace = traces.find(
+    (item) => item.toolName === toolName && item.status === "succeeded" && asArray(item.output).length > 0
+  );
   return asArray(trace?.output)[0];
 }
 
@@ -138,6 +140,295 @@ function scenarioFromMessage(userMessage: string): "family" | "friends" {
   return /朋友|好友|同学|同事|四|4/.test(userMessage) && !/老婆|妻子|孩子|亲子|娃/.test(userMessage)
     ? "friends"
     : "family";
+}
+
+function numberValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
+}
+
+function outputItems(traces: ToolCallTrace[], toolName: string) {
+  return traces
+    .filter((trace) => trace.toolName === toolName && trace.status === "succeeded")
+    .flatMap((trace) => asArray(trace.output))
+    .map(asRecord);
+}
+
+function findRecordById(records: Record<string, unknown>[], id?: string) {
+  return id ? records.find((record) => valueText(record.id) === id) : undefined;
+}
+
+function successfulTrace(traces: ToolCallTrace[], toolName: string) {
+  return traces.find((trace) => trace.toolName === toolName && trace.status === "succeeded");
+}
+
+function successfulTraceByOutput(
+  traces: ToolCallTrace[],
+  toolName: string,
+  predicate: (output: Record<string, unknown>, input: Record<string, unknown>) => boolean
+) {
+  return traces.find((trace) => {
+    if (trace.toolName !== toolName || trace.status !== "succeeded") {
+      return false;
+    }
+
+    return predicate(asRecord(trace.output), asRecord(trace.input));
+  });
+}
+
+function clockToMinutes(time?: string) {
+  const match = time?.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) {
+    return undefined;
+  }
+
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function minutesToClock(minutes: number) {
+  const normalized = ((minutes % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalized / 60);
+  const mins = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function addMinutes(time: string, minutes: number) {
+  const base = clockToMinutes(time);
+  return base === undefined ? time : minutesToClock(base + minutes);
+}
+
+function diffMinutes(start: string, end: string) {
+  const startMinutes = clockToMinutes(start);
+  const endMinutes = clockToMinutes(end);
+  if (startMinutes === undefined || endMinutes === undefined) {
+    return undefined;
+  }
+
+  return Math.max(0, endMinutes - startMinutes);
+}
+
+function buildTraceSynthesizedPlan(state: AgentRuntimeState, traces: ToolCallTrace[]): Plan | undefined {
+  const scenario = scenarioFromMessage(state.userMessage);
+  const activities = outputItems(traces, "searchNearbyActivities");
+  const restaurants = outputItems(traces, "searchRestaurants");
+  const activityAvailability = successfulTraceByOutput(
+    traces,
+    "checkActivityAvailability",
+    (output) => output.available === true
+  );
+  const restaurantAvailability = successfulTraceByOutput(
+    traces,
+    "checkRestaurantAvailability",
+    (output) => output.available === true
+  );
+  const hasTravelOrAvailability = traces.some(
+    (trace) =>
+      trace.status === "succeeded" &&
+      ["estimateTravelTime", "checkActivityAvailability", "checkRestaurantAvailability", "checkQueueTime"].includes(
+        trace.toolName
+      )
+  );
+
+  if (activities.length === 0 || restaurants.length === 0 || !hasTravelOrAvailability) {
+    return undefined;
+  }
+
+  const activityAvailabilityInput = asRecord(activityAvailability?.input);
+  const activityAvailabilityOutput = asRecord(activityAvailability?.output);
+  const activityId =
+    valueText(activityAvailabilityOutput.activityId) ??
+    valueText(activityAvailabilityInput.activityId) ??
+    valueText(activities[0]?.id);
+  const activity = findRecordById(activities, activityId) ?? activities[0] ?? {};
+  const activityName = valueText(activity.name) ?? valueText(activity.title) ?? "本地活动";
+  const activityTime = valueText(activityAvailabilityInput.time) ?? "14:30";
+  const partySize =
+    numberValue(activityAvailabilityInput.partySize) ??
+    numberValue(asRecord(restaurantAvailability?.input).partySize) ??
+    (scenario === "family" ? 3 : 4);
+  const activityDuration = numberValue(activity.durationMinutes) ?? (scenario === "family" ? 90 : 100);
+  const activityEndTime = addMinutes(activityTime, activityDuration);
+
+  const restaurantAvailabilityInput = asRecord(restaurantAvailability?.input);
+  const restaurantAvailabilityOutput = asRecord(restaurantAvailability?.output);
+  const restaurantId =
+    valueText(restaurantAvailabilityOutput.restaurantId) ??
+    valueText(restaurantAvailabilityInput.restaurantId) ??
+    valueText(restaurants[0]?.id);
+  const restaurant = findRecordById(restaurants, restaurantId) ?? restaurants[0] ?? {};
+  const restaurantName = valueText(restaurant.name) ?? "晚餐餐厅";
+  const mealTime =
+    valueText(restaurantAvailabilityOutput.time) ?? valueText(restaurantAvailabilityInput.time) ?? "17:30";
+  const mealEndTime = addMinutes(mealTime, 60);
+
+  const travelTrace = successfulTrace(traces, "estimateTravelTime");
+  const travelOutput = asRecord(travelTrace?.output);
+  const travelMinutes = numberValue(travelOutput.minutes) ?? 20;
+  const travelStartTime = addMinutes(activityTime, -travelMinutes);
+  const queueTrace = successfulTraceByOutput(
+    traces,
+    "checkQueueTime",
+    (output) =>
+      valueText(output.restaurantId) === restaurantId &&
+      (!valueText(output.time) || valueText(output.time) === mealTime)
+  );
+  const queueMinutes = numberValue(asRecord(queueTrace?.output).queueMinutes);
+  const activityBudget =
+    numberValue(activityAvailabilityOutput.priceCny) ?? (numberValue(activity.priceCny) ?? 0) * partySize;
+  const mealBudget = (numberValue(restaurant.averagePriceCny) ?? 0) * partySize;
+  const totalBudget = Math.max(0, Math.round(activityBudget + mealBudget));
+  const totalDuration = diffMinutes(travelStartTime, mealEndTime) ?? 300;
+  const recoveredFailures = traces.filter((trace) => trace.status === "failed" && trace.error?.recoverable).slice(0, 2);
+  const hasCheckedActivity = Boolean(activityAvailability);
+  const hasCheckedRestaurant = Boolean(restaurantAvailability);
+
+  return {
+    id: `trace-${scenario}-plan`,
+    title: scenario === "family" ? "亲子活动方案" : "朋友活动方案",
+    scenario,
+    summary: "已基于查到的活动候选、餐厅桌位和路程信息整理出可确认方案。",
+    totalDurationMinutes: totalDuration,
+    estimatedBudgetCny: totalBudget || (scenario === "family" ? 620 : 840),
+    confidence: hasCheckedActivity && hasCheckedRestaurant ? 0.84 : 0.72,
+    timeline: [
+      {
+        id: `${scenario}-trace-travel`,
+        type: "travel",
+        title: "从当前位置出发",
+        placeName: "路上",
+        startTime: travelStartTime,
+        endTime: activityTime,
+        durationMinutes: travelMinutes,
+        notes: travelTrace
+          ? [`预计 ${travelMinutes} 分钟，${valueText(travelOutput.distanceKm) ?? "-"} km。`]
+          : ["保持近距离出行。"],
+        evidence: ["getUserProfile", "estimateTravelTime"]
+      },
+      {
+        id: `${scenario}-trace-activity`,
+        type: valueText(activity.type) === "free_walk" ? "free_walk" : "activity",
+        title: activityName,
+        placeName: activityName,
+        address: valueText(activity.address),
+        startTime: activityTime,
+        endTime: activityEndTime,
+        durationMinutes: activityDuration,
+        notes: [
+          hasCheckedActivity ? `已确认 ${activityTime} 有名额。` : "来自已查到的活动候选，确认前保留可用性提示。",
+          ...(scenario === "family" ? ["适合亲子同行，节奏较轻。"] : ["适合朋友同行和社交聊天。"])
+        ],
+        evidence: ["searchNearbyActivities", ...(hasCheckedActivity ? ["checkActivityAvailability"] : [])]
+      },
+      {
+        id: `${scenario}-trace-meal`,
+        type: "meal",
+        title: scenario === "family" ? "清淡低脂晚餐" : "轻松聚餐",
+        placeName: restaurantName,
+        address: valueText(restaurant.address),
+        startTime: mealTime,
+        endTime: mealEndTime,
+        durationMinutes: 60,
+        notes: [
+          hasCheckedRestaurant ? `已确认 ${mealTime} 可订 ${partySize} 人桌。` : "来自已查到的餐厅候选。",
+          queueMinutes === undefined ? "排队情况可在确认前复核。" : `预计排队 ${queueMinutes} 分钟。`
+        ],
+        evidence: ["searchRestaurants", ...(hasCheckedRestaurant ? ["checkRestaurantAvailability"] : [])]
+      }
+    ],
+    requiredActions: [
+      {
+        id: `${scenario}-trace-book-activity`,
+        type: "book_activity",
+        status: "pending",
+        toolName: "bookActivity",
+        optional: false,
+        input: {
+          activityId,
+          partySize,
+          time: activityTime,
+          contactName: "小明"
+        }
+      },
+      {
+        id: `${scenario}-trace-reserve-meal`,
+        type: "reserve_restaurant",
+        status: "pending",
+        toolName: "reserveRestaurant",
+        optional: !hasCheckedRestaurant,
+        input: {
+          restaurantId,
+          partySize,
+          time: mealTime,
+          contactName: "小明"
+        }
+      },
+      {
+        id: `${scenario}-trace-send-message`,
+        type: "send_message",
+        status: "pending",
+        toolName: "sendMessage",
+        optional: false,
+        input: {
+          to: scenario === "family" ? "老婆" : "小张",
+          content:
+            scenario === "family"
+              ? `我查好了，${activityTime} 去${activityName}，${mealTime} 去${restaurantName}，确认后我来预约。`
+              : `我查好了，${activityTime} 去${activityName}，${mealTime} 去${restaurantName}，确认后我来预约。`
+        }
+      }
+    ],
+    alternatives: [],
+    risks: [
+      ...recoveredFailures.map((trace) => ({
+        code: `RECOVERED_${trace.toolName}`,
+        message: `${trace.toolName}：${trace.error?.message ?? "已自动避开不可用选项。"}`,
+        severity: "info" as const
+      })),
+      ...(!hasCheckedActivity
+        ? [
+            {
+              code: "ACTIVITY_AVAILABILITY_UNCHECKED",
+              message: "活动名额尚未完整确认，执行前会再走预约工具校验。",
+              severity: "warning" as const
+            }
+          ]
+        : []),
+      ...(!hasCheckedRestaurant
+        ? [
+            {
+              code: "RESTAURANT_AVAILABILITY_UNCHECKED",
+              message: "餐厅桌位尚未完整确认，执行前会再走订位工具校验。",
+              severity: "warning" as const
+            }
+          ]
+        : [])
+    ]
+  };
+}
+
+async function synthesizePlanFromTraces(state: AgentRuntimeState, traces: ToolCallTrace[]) {
+  const synthesizedPlan = buildTraceSynthesizedPlan(state, traces);
+  if (!synthesizedPlan) {
+    return undefined;
+  }
+
+  await emitAgentStep(state, "verification", "生成方案", "succeeded", synthesizedPlan.summary);
+  return {
+    toolTraces: traces,
+    selectedPlan: synthesizedPlan,
+    messages: [
+      message("user", state.userMessage, state.now),
+      message("assistant", "我已基于查到的活动、餐厅和路程信息整理出可确认方案。", state.now)
+    ]
+  } satisfies Partial<AgentRuntimeState>;
 }
 
 function buildFallbackPlan(state: AgentRuntimeState, traces: ToolCallTrace[]): Plan | undefined {
@@ -373,6 +664,7 @@ export async function runReActPlanning(state: AgentRuntimeState): Promise<Partia
     { role: "user", content: state.userMessage }
   ];
   let traces = state.toolTraces;
+  let schemaRepairCount = 0;
 
   try {
     for (let loop = 0; loop < MAX_REACT_LOOPS; loop += 1) {
@@ -384,6 +676,7 @@ export async function runReActPlanning(state: AgentRuntimeState): Promise<Partia
         try {
           final = parseFinalResponse(turn.content);
         } catch (error) {
+          schemaRepairCount += 1;
           await emitAgentStep(state, "repair", "修复方案结构", "running", validationMessage(error));
           messages.push({
             role: "assistant",
@@ -528,6 +821,18 @@ export async function runReActPlanning(state: AgentRuntimeState): Promise<Partia
         }
       }
       await emitAgentStep(state, "tooling", "调用规划工具", "succeeded", `已累计 ${traces.length} 个工具结果`);
+
+      if (schemaRepairCount > 0 || loop >= 2) {
+        const synthesized = await synthesizePlanFromTraces(state, traces);
+        if (synthesized) {
+          return synthesized;
+        }
+      }
+    }
+
+    const synthesized = await synthesizePlanFromTraces(state, traces);
+    if (synthesized) {
+      return synthesized;
     }
 
     const fallbackPlan = buildFallbackPlan(state, traces);

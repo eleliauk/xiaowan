@@ -36,6 +36,26 @@ function text(value: unknown): string | undefined {
   return String(value);
 }
 
+function displayText(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(displayText).join(",");
+  }
+
+  if (value && typeof value === "object") {
+    const record = asRecord(value);
+    const label = text(record.label) ?? text(record.name) ?? text(record.title) ?? text(record.id);
+    if (label) {
+      return label;
+    }
+
+    const lat = text(record.lat);
+    const lng = text(record.lng);
+    return lat && lng ? `${lat},${lng}` : "对象";
+  }
+
+  return text(value) ?? "-";
+}
+
 function pickName(value: unknown) {
   const record = asRecord(value);
   return text(record.name) ?? text(record.title) ?? text(record.label) ?? text(record.id) ?? "候选";
@@ -71,7 +91,7 @@ export function toolStartedDisplay(toolName: string, input: unknown): Display {
   const record = asRecord(input);
   const items = Object.entries(record)
     .slice(0, 3)
-    .map(([label, value]) => ({ label, value: text(value) ?? "-" }));
+    .map(([label, value]) => ({ label, value: displayText(value) }));
 
   return {
     title: titleForTool(toolName),

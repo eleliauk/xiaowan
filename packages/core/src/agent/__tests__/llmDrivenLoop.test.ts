@@ -635,4 +635,194 @@ describe("LLM-driven agent loop", () => {
     expect(events.some((event) => event.type === "plan.updated")).toBe(true);
     expect(events.at(-1)).toMatchObject({ type: "run.completed", state: "READY_FOR_CONFIRMATION" });
   });
+
+  it("synthesizes a normal plan from successful traces when the model keeps calling tools", async () => {
+    const turns: ToolCallingTurn[] = [
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([familyToolCalls[0]!]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "empty-activities-1",
+            toolName: "searchNearbyActivities",
+            input: { scenario: "family", tags: ["亲子", "户外", "室内"], radiusKm: 5 }
+          },
+          familyToolCalls[3]!
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "empty-activities-2",
+            toolName: "searchNearbyActivities",
+            input: { scenario: "family", tags: ["公园", "游乐", "儿童", "展览"], radiusKm: 5 }
+          }
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "activities-wide",
+            toolName: "searchNearbyActivities",
+            input: { scenario: "family", radiusKm: 8 }
+          }
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "kid-1500",
+            toolName: "checkActivityAvailability",
+            input: { activityId: "kid-pottery", partySize: 3, time: "15:00" }
+          },
+          {
+            id: "restaurant-1800",
+            toolName: "checkRestaurantAvailability",
+            input: { restaurantId: "qinghe-bistro", partySize: 3, time: "18:00" }
+          }
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "queue-1800",
+            toolName: "checkQueueTime",
+            input: { restaurantId: "qinghe-bistro", time: "18:00" }
+          }
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "travel-home-kid",
+            toolName: "estimateTravelTime",
+            input: {
+              from: { label: "小明家", lat: 39.996, lng: 116.48 },
+              to: { label: "小手作陶艺亲子馆", lat: 40.002, lng: 116.484 }
+            }
+          }
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "repeat-wide",
+            toolName: "searchNearbyActivities",
+            input: { scenario: "family", radiusKm: 8 }
+          }
+        ]),
+        finishReason: "tool_calls"
+      }
+    ];
+
+    const events = await collectEvents({
+      message: "111",
+      now,
+      llmClient: new ScriptedReActLLMClient(turns)
+    });
+    const plan = planFrom(events);
+    const assistant = events.find((event) => event.type === "message.delta");
+    const artifact = events.find((event) => event.type === "artifact.updated");
+
+    expect(plan?.title).toBe("亲子活动方案");
+    expect(plan?.summary).not.toContain("工具查询没有完全收敛");
+    expect(plan?.timeline.some((step) => step.placeName === "小手作陶艺亲子馆")).toBe(true);
+    expect(plan?.requiredActions[0]?.input).toMatchObject({ activityId: "kid-pottery", time: "15:00" });
+    expect(assistant).toMatchObject({
+      type: "message.delta",
+      delta: expect.not.stringContaining("兜底")
+    });
+    expect(artifact).toMatchObject({
+      type: "artifact.updated",
+      artifact: {
+        title: "亲子活动方案",
+        status: "draft"
+      }
+    });
+    expect(artifact?.type === "artifact.updated" ? artifact.artifact.content : "").toContain("小手作陶艺亲子馆");
+    expect(events.at(-1)).toMatchObject({ type: "run.completed", state: "READY_FOR_CONFIRMATION" });
+  });
+
+  it("forces finalization after schema repair once enough tool facts are available", async () => {
+    const lateUnneededCall: PlannedToolCall = {
+      id: "late-unneeded",
+      toolName: "searchRestaurants",
+      input: { scenario: "family", partySize: 3, radiusKm: 8 }
+    };
+    const llmClient = new ScriptedReActLLMClient([
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([familyToolCalls[0]!]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "我先整理一下",
+        toolCalls: [],
+        finishReason: "stop"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "activities-wide",
+            toolName: "searchNearbyActivities",
+            input: { scenario: "family", radiusKm: 8 }
+          },
+          familyToolCalls[3]!
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([
+          {
+            id: "kid-1500",
+            toolName: "checkActivityAvailability",
+            input: { activityId: "kid-pottery", partySize: 3, time: "15:00" }
+          },
+          {
+            id: "restaurant-1800",
+            toolName: "checkRestaurantAvailability",
+            input: { restaurantId: "qinghe-bistro", partySize: 3, time: "18:00" }
+          }
+        ]),
+        finishReason: "tool_calls"
+      },
+      {
+        content: "",
+        toolCalls: toNativeToolCalls([lateUnneededCall]),
+        finishReason: "tool_calls"
+      }
+    ]);
+
+    const events = await collectEvents({
+      message: "111",
+      now,
+      llmClient
+    });
+    const plan = planFrom(events);
+
+    expect(llmClient.toolInputs).toHaveLength(4);
+    expect(events.some((event) => event.type === "tool.started" && event.toolCallId === "late-unneeded")).toBe(false);
+    expect(plan?.title).toBe("亲子活动方案");
+    expect(plan?.summary).not.toContain("工具查询没有完全收敛");
+    expect(events.some((event) => event.type === "agent.step" && event.phase === "repair")).toBe(true);
+    expect(events.at(-1)).toMatchObject({ type: "run.completed", state: "READY_FOR_CONFIRMATION" });
+  });
 });
