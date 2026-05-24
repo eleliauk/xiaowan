@@ -18,3 +18,16 @@ schema: spec-driven
 #       - Always include a "Non-goals" section
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+context: |
+  Project: Local short-activity planning and execution Agent for a Meituan hackathon demo.
+  Language: TypeScript only.
+  Repository shape: pnpm workspace + Turborepo monorepo.
+  Frontend: Next.js App Router.
+  Backend: Next.js Route Handlers as the MVP BFF layer.
+  Agent runtime: LangGraph.js StateGraph for explicit planning, verification, repair, confirmation, and execution graphs.
+  Agent tooling: LangChain JS tool() wrappers backed by a local TypeScript tool registry.
+  Data: local mock data for activities, restaurants, availability, queue time, delivery products, and user profiles.
+  Scope: demo-quality MVP proving planning + tool validation + user confirmation + execution receipts.
+  Safety boundary: no real payment, no real ordering, no real Meituan API integration in MVP.
+  Product stance: this is not search recommendation. It is a task-completion agent that turns a natural-language goal into an executable afternoon plan.
+  Required demo scenarios: family outing with wife and 5-year-old child; friends outing with 4 people, 2 men and 2 women.

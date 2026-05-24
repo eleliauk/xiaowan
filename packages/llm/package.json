@@ -1,0 +1,20 @@
+{
+  "name": "@mh/llm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/openai": "^1.1.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

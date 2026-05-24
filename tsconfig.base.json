@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mh/shared": ["packages/shared/src/index.ts"],
+      "@mh/data": ["packages/data/src/index.ts"],
+      "@mh/tools": ["packages/tools/src/index.ts"],
+      "@mh/llm": ["packages/llm/src/index.ts"],
+      "@mh/agent": ["packages/agent/src/index.ts"]
+    }
+  }
+}
