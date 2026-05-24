@@ -259,7 +259,9 @@ describe("runtime services", () => {
             title: "规划中",
             status: "running"
           };
-          await new Promise<void>((resolve) => input.abortSignal?.addEventListener("abort", () => resolve(), { once: true }));
+          await new Promise<void>((resolve) =>
+            input.abortSignal?.addEventListener("abort", () => resolve(), { once: true })
+          );
         }
       }
     });

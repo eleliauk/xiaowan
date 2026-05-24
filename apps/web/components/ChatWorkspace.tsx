@@ -180,9 +180,11 @@ function RunActivityPanel({
                   {stepDetail(step) ? <p>{stepDetail(step)}</p> : null}
                   {displayItems(step).length > 0 && (
                     <div className="step-pills">
-                      {displayItems(step).slice(0, 3).map((item) => (
-                        <span key={`${step.id}:${item.label}:${item.value}`}>{`${item.label}: ${item.value}`}</span>
-                      ))}
+                      {displayItems(step)
+                        .slice(0, 3)
+                        .map((item) => (
+                          <span key={`${step.id}:${item.label}:${item.value}`}>{`${item.label}: ${item.value}`}</span>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -196,7 +198,9 @@ function RunActivityPanel({
       {(thread.plan || thread.confirmation || thread.receipts.length > 0 || thread.failure) && (
         <div className="artifact-inline">
           <div>
-            <strong>{thread.failure ? "本轮需要处理" : thread.receipts.length > 0 ? "执行结果已生成" : "方案产物已生成"}</strong>
+            <strong>
+              {thread.failure ? "本轮需要处理" : thread.receipts.length > 0 ? "执行结果已生成" : "方案产物已生成"}
+            </strong>
             <span>
               {thread.failure?.summary ??
                 thread.confirmation?.summary ??
@@ -652,10 +656,7 @@ export function ChatWorkspace() {
                       activeThread.receipts.length > 0 ||
                       activeThread.failure) && (
                       <article className="message assistant">
-                        <RunActivityPanel
-                          thread={activeThread}
-                          openArtifact={(tab) => setArtifactPanel(true, tab)}
-                        />
+                        <RunActivityPanel thread={activeThread} openArtifact={(tab) => setArtifactPanel(true, tab)} />
                       </article>
                     )}
                   </div>

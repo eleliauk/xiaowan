@@ -111,7 +111,7 @@ function toolObservation(trace: ToolCallTrace) {
         toolName: trace.toolName,
         input: trace.input,
         error: trace.error
-    };
+      };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

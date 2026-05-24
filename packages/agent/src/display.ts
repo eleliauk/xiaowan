@@ -193,7 +193,9 @@ function successDisplay(trace: ToolCallTrace): Display {
 function failureDisplay(toolName: string, error?: ToolError): Display {
   return {
     title: titleForTool(toolName),
-    summary: error?.suggestedFallback ? `${error.message}；建议：${error.suggestedFallback}` : (error?.message ?? "工具调用失败。"),
+    summary: error?.suggestedFallback
+      ? `${error.message}；建议：${error.suggestedFallback}`
+      : (error?.message ?? "工具调用失败。"),
     items: error
       ? [
           { label: "错误", value: error.code, status: error.recoverable ? "recoverable" : "blocking" },
@@ -218,4 +220,3 @@ export function toolFinishedDisplay(trace: ToolCallTrace): Display {
 
   return trace.status === "succeeded" ? successDisplay(trace) : failureDisplay(trace.toolName, trace.error);
 }
-

@@ -361,19 +361,19 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
       queue.push({
         ...streamContext,
         type: "run.failed",
-          error: {
-            code: "UNKNOWN",
-            message: error instanceof Error ? error.message : "Unknown chat stream failure",
-            recoverable: false
-          },
-          retryable: true,
-          display: {
-            title: "运行失败",
-            summary: error instanceof Error ? error.message : "Unknown chat stream failure",
-            severity: "error",
-            artifactRef: "diagnostics"
-          }
-        });
+        error: {
+          code: "UNKNOWN",
+          message: error instanceof Error ? error.message : "Unknown chat stream failure",
+          recoverable: false
+        },
+        retryable: true,
+        display: {
+          title: "运行失败",
+          summary: error instanceof Error ? error.message : "Unknown chat stream failure",
+          severity: "error",
+          artifactRef: "diagnostics"
+        }
+      });
       queue.end();
     }
   })();

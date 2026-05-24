@@ -124,10 +124,7 @@ function upsertStep(steps: ClientStep[], step: ClientStep) {
   return steps.map((item) => (item.id === step.id ? { ...item, ...step } : item));
 }
 
-function withArtifactPanel(
-  thread: ClientThread,
-  selected: NonNullable<ClientArtifactPanel["selected"]>
-): ClientThread {
+function withArtifactPanel(thread: ClientThread, selected: NonNullable<ClientArtifactPanel["selected"]>): ClientThread {
   return {
     ...thread,
     artifactPanel: {

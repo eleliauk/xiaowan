@@ -5,7 +5,7 @@ export default defineConfig({
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts"],
     environment: "node",
     env: {
-      LLM_PROVIDER: "deepseek",
+      LLM_PROVIDER: "deepseek"
     }
   },
   resolve: {
