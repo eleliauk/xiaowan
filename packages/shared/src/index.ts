@@ -51,12 +51,7 @@ export type PlanStep = z.infer<typeof PlanStepSchema>;
 
 export const ExecutionReceiptSchema = z.object({
   id: z.string(),
-  type: z.enum([
-    "activity_booking",
-    "restaurant_reservation",
-    "delivery_order",
-    "message_send"
-  ]),
+  type: z.enum(["activity_booking", "restaurant_reservation", "delivery_order", "message_send"]),
   targetName: z.string(),
   time: z.string().optional(),
   status: z.enum(["confirmed", "sent", "scheduled", "failed"]),
@@ -66,12 +61,7 @@ export type ExecutionReceipt = z.infer<typeof ExecutionReceiptSchema>;
 
 export const PlanActionSchema = z.object({
   id: z.string(),
-  type: z.enum([
-    "reserve_restaurant",
-    "book_activity",
-    "schedule_delivery",
-    "send_message"
-  ]),
+  type: z.enum(["reserve_restaurant", "book_activity", "schedule_delivery", "send_message"]),
   status: z.enum(["pending", "running", "succeeded", "failed", "skipped"]),
   toolName: z.string(),
   input: z.unknown(),
@@ -98,11 +88,15 @@ export const PlanSchema = z.object({
   confidence: z.number(),
   timeline: z.array(PlanStepSchema),
   requiredActions: z.array(PlanActionSchema),
-  alternatives: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    reason: z.string()
-  })).default([]),
+  alternatives: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        reason: z.string()
+      })
+    )
+    .default([]),
   risks: z.array(PlanRiskSchema).default([])
 });
 export type Plan = z.infer<typeof PlanSchema>;
@@ -148,20 +142,17 @@ export const AgentRunOutputSchema = z.object({
   messages: z.array(AgentMessageSchema),
   plan: PlanSchema.optional(),
   toolTraces: z.array(ToolCallTraceSchema),
-  needsUserInput: z.object({
-    question: z.string(),
-    options: z.array(z.string()).optional()
-  }).optional(),
+  needsUserInput: z
+    .object({
+      question: z.string(),
+      options: z.array(z.string()).optional()
+    })
+    .optional(),
   executionReceipts: z.array(ExecutionReceiptSchema).default([])
 });
 export type AgentRunOutput = z.infer<typeof AgentRunOutputSchema>;
 
-export const AgentRunStateSchema = z.enum([
-  "WAITING_FOR_USER",
-  "READY_FOR_CONFIRMATION",
-  "DONE",
-  "PARTIAL_FAILURE"
-]);
+export const AgentRunStateSchema = z.enum(["WAITING_FOR_USER", "READY_FOR_CONFIRMATION", "DONE", "PARTIAL_FAILURE"]);
 export type AgentRunState = z.infer<typeof AgentRunStateSchema>;
 
 const AgentStreamEventBaseSchema = z.object({

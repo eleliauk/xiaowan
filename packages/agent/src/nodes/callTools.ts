@@ -1,5 +1,5 @@
-import type { AgentGraphState } from "../state";
 import { tracedToolCall } from "../helpers";
+import type { AgentGraphState } from "../state";
 
 export async function callTools(state: AgentGraphState): Promise<Partial<AgentGraphState>> {
   if (!state.goal) {

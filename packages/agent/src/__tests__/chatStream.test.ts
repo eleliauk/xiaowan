@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { AgentStreamEvent } from "@mh/shared";
+import { describe, expect, it } from "vitest";
 import { runChatTurn, runPlanning } from "../index";
 
 const now = "2026-05-24T12:00:00+08:00";
@@ -58,7 +58,8 @@ describe("runChatTurn", () => {
     });
 
     const failedTool = events.find(
-      (event) => event.type === "tool.finished" && event.toolName === "checkRestaurantAvailability" && event.status === "failed"
+      (event) =>
+        event.type === "tool.finished" && event.toolName === "checkRestaurantAvailability" && event.status === "failed"
     );
     const planUpdate = events.find((event) => event.type === "plan.updated");
 

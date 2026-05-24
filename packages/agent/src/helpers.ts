@@ -14,11 +14,7 @@ export function message(role: AgentMessage["role"], content: string, now: string
   };
 }
 
-export async function tracedToolCall(
-  toolName: string,
-  input: unknown,
-  existing: ToolCallTrace[]
-) {
+export async function tracedToolCall(toolName: string, input: unknown, existing: ToolCallTrace[]) {
   const registry = createDefaultToolRegistry();
   const startedAt = new Date().toISOString();
   const id = createId("tool");
@@ -70,8 +66,6 @@ export function replaceTimelineStep(plan: Plan, stepId: string, step: PlanStep):
 export function updateAction(plan: Plan, actionId: string, update: Partial<PlanAction>): Plan {
   return {
     ...plan,
-    requiredActions: plan.requiredActions.map((action) =>
-      action.id === actionId ? { ...action, ...update } : action
-    )
+    requiredActions: plan.requiredActions.map((action) => (action.id === actionId ? { ...action, ...update } : action))
   };
 }

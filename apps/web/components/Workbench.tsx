@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import type { AgentRunOutput, ToolCallTrace } from "@mh/shared";
+import { useMemo, useState } from "react";
 
 const familyPrompt = "今天下午是空的，想和老婆孩子出去玩几个小时，别离家太远，帮我安排一下。";
 const friendsPrompt = "今天下午我们 4 个朋友，2 男 2 女，想出去玩几个小时，吃饭也一起安排，别太远。";
@@ -33,7 +33,10 @@ export function Workbench() {
       return String(sendReceipt.details.preview ?? "");
     }
     return session?.plan?.requiredActions.find((action) => action.type === "send_message")?.input
-      ? String((session.plan.requiredActions.find((action) => action.type === "send_message")?.input as { content?: string }).content)
+      ? String(
+          (session.plan.requiredActions.find((action) => action.type === "send_message")?.input as { content?: string })
+            .content
+        )
       : "";
   }, [session]);
 
@@ -84,11 +87,7 @@ export function Workbench() {
           <div className="panelHeader">
             <h2>目标</h2>
           </div>
-          <textarea
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            aria-label="自然语言目标"
-          />
+          <textarea value={message} onChange={(event) => setMessage(event.target.value)} aria-label="自然语言目标" />
           <div className="quickActions">
             <button
               type="button"

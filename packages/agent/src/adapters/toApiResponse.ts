@@ -15,8 +15,7 @@ export function toPlanningResponse(state: AgentGraphState): AgentRunOutput {
 
 export function toExecutionResponse(state: AgentGraphState): AgentRunOutput {
   const hasFailedRequiredAction =
-    state.selectedPlan?.requiredActions.some((action) => action.status === "failed" && !action.optional) ??
-    true;
+    state.selectedPlan?.requiredActions.some((action) => action.status === "failed" && !action.optional) ?? true;
 
   return {
     sessionId: state.sessionId,

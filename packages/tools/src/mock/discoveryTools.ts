@@ -1,5 +1,5 @@
 import { activities, contacts, familyMembers, friendMembers, homeLocation, products, restaurants } from "@mh/data";
-import { ExecutionReceiptSchema, LocationSchema, type ExecutionReceipt } from "@mh/shared";
+import { type ExecutionReceipt, ExecutionReceiptSchema, LocationSchema } from "@mh/shared";
 import { z } from "zod";
 import { createAppTool } from "../registry";
 import { distanceKm, includesAny } from "./helpers";
@@ -110,13 +110,14 @@ export const sendMessage = createAppTool({
     content: z.string()
   }),
   outputSchema: ExecutionReceiptSchema,
-  handler: ({ to, content }) => ({
-    id: `MSG-${Date.now()}`,
-    type: "message_send",
-    targetName: to,
-    status: "sent",
-    details: {
-      preview: content.slice(0, 80)
-    }
-  } satisfies ExecutionReceipt)
+  handler: ({ to, content }) =>
+    ({
+      id: `MSG-${Date.now()}`,
+      type: "message_send",
+      targetName: to,
+      status: "sent",
+      details: {
+        preview: content.slice(0, 80)
+      }
+    }) satisfies ExecutionReceipt
 });

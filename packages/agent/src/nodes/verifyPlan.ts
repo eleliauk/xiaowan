@@ -30,9 +30,7 @@ export async function verifyPlan(state: AgentGraphState): Promise<Partial<AgentG
     };
   }
 
-  const totalOk =
-    state.selectedPlan.totalDurationMinutes >= 240 &&
-    state.selectedPlan.totalDurationMinutes <= 390;
+  const totalOk = state.selectedPlan.totalDurationMinutes >= 240 && state.selectedPlan.totalDurationMinutes <= 390;
 
   return {
     planValidation: {

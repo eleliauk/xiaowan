@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { type AgentStreamEvent, AgentStreamEventSchema } from "@mh/shared";
 import {
   ArrowUp,
   Bot,
@@ -21,9 +21,9 @@ import {
   Wrench,
   X
 } from "lucide-react";
-import { toast, Toaster } from "sonner";
-import { AgentStreamEventSchema, type AgentStreamEvent } from "@mh/shared";
-import { applyClientEvent, createEmptyThread, type ClientThread } from "../lib/chatState";
+import { useMemo, useRef, useState } from "react";
+import { Toaster, toast } from "sonner";
+import { applyClientEvent, type ClientThread, createEmptyThread } from "../lib/chatState";
 import { Button } from "./ui/button";
 
 const familyPrompt = "今天下午是空的，想和老婆孩子出去玩几个小时，别离家太远，帮我安排一下。";
@@ -90,7 +90,9 @@ export function ChatWorkspace() {
   const currentRequestRef = useRef<AbortController | null>(null);
 
   const activeThread = threads[activeThreadId] ?? createEmptyThread(activeThreadId);
-  const recentThreads = Object.values(threads).filter((thread) => !isDraftThread(thread.id) || thread.messages.length > 0);
+  const recentThreads = Object.values(threads).filter(
+    (thread) => !isDraftThread(thread.id) || thread.messages.length > 0
+  );
   const canSend = input.trim().length > 0 && !isStreaming;
 
   function startNewChat() {
@@ -271,198 +273,198 @@ export function ChatWorkspace() {
           </div>
         </aside>
 
-      <main className="chat-main">
-        <header className="chat-header">
-          <div>
-            <h1>{activeThread.title}</h1>
-            <span>{statusText(activeThread)}</span>
-          </div>
-          <div className="header-actions">
-            <Button variant="ghost" size="sm">
-              <Download size={15} />
-              导出
-            </Button>
-            <Button variant="ghost" size="sm">
-              <FileText size={15} />
-              文件
-            </Button>
-          </div>
-        </header>
-
-        <section className="conversation">
-          {activeThread.messages.length === 0 ? (
-            <div className="welcome-state">
-              <Sparkles size={24} />
-              <h2>今天下午想怎么安排？</h2>
-              <div className="suggestions">
-                <button type="button" onClick={() => void sendMessage(familyPrompt)}>
-                  家庭亲子半日
-                </button>
-                <button type="button" onClick={() => void sendMessage(friendsPrompt)}>
-                  四人朋友局
-                </button>
-              </div>
+        <main className="chat-main">
+          <header className="chat-header">
+            <div>
+              <h1>{activeThread.title}</h1>
+              <span>{statusText(activeThread)}</span>
             </div>
-          ) : (
-            <div className="message-stack">
-              {activeThread.messages.map((message) => (
-                <article className={`message ${message.role}`} key={message.id}>
-                  <div className="message-content">{message.content}</div>
-                </article>
-              ))}
+            <div className="header-actions">
+              <Button variant="ghost" size="sm">
+                <Download size={15} />
+                导出
+              </Button>
+              <Button variant="ghost" size="sm">
+                <FileText size={15} />
+                文件
+              </Button>
+            </div>
+          </header>
 
-              {(activeThread.steps.length > 0 || activeThread.plan || activeThread.receipts.length > 0) && (
-                <article className="message assistant">
-                  <div className="assistant-artifacts">
-                    {activeThread.steps.length > 0 && (
-                      <details className="steps-card" open={activeThread.status === "STREAMING"}>
-                        <summary>
-                          <span>
-                            <ChevronDown size={16} />
-                            执行步骤
-                          </span>
-                          <small>{activeThread.steps.length}</small>
-                        </summary>
-                        <div className="step-list">
-                          {activeThread.steps.map((step) => (
-                            <div className={`step-row ${step.status}`} key={step.id}>
-                              {step.kind === "tool" ? <Wrench size={15} /> : <Clock3 size={15} />}
-                              <div>
-                                <strong>{step.title}</strong>
-                                <p>{step.error?.message ?? step.detail ?? step.outputSummary ?? step.inputSummary}</p>
-                              </div>
-                              <em>{step.status}</em>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    )}
+          <section className="conversation">
+            {activeThread.messages.length === 0 ? (
+              <div className="welcome-state">
+                <Sparkles size={24} />
+                <h2>今天下午想怎么安排？</h2>
+                <div className="suggestions">
+                  <button type="button" onClick={() => void sendMessage(familyPrompt)}>
+                    家庭亲子半日
+                  </button>
+                  <button type="button" onClick={() => void sendMessage(friendsPrompt)}>
+                    四人朋友局
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="message-stack">
+                {activeThread.messages.map((message) => (
+                  <article className={`message ${message.role}`} key={message.id}>
+                    <div className="message-content">{message.content}</div>
+                  </article>
+                ))}
 
-                    {activeThread.plan && (
-                      <div className="plan-card">
-                        <div className="plan-card-header">
-                          <div>
-                            <span className="artifact-kicker">方案</span>
-                            <h3>{activeThread.plan.title}</h3>
-                          </div>
-                          <strong>{Math.round(activeThread.plan.totalDurationMinutes / 60)}h</strong>
-                        </div>
-                        <p>{activeThread.plan.summary}</p>
-                        <ol className="timeline-list">
-                          {activeThread.plan.timeline.map((step) => (
-                            <li key={step.id}>
-                              <time>
-                                {step.startTime}-{step.endTime}
-                              </time>
-                              <div>
-                                <strong>{step.title}</strong>
-                                <span>{step.placeName ?? step.address ?? step.type}</span>
+                {(activeThread.steps.length > 0 || activeThread.plan || activeThread.receipts.length > 0) && (
+                  <article className="message assistant">
+                    <div className="assistant-artifacts">
+                      {activeThread.steps.length > 0 && (
+                        <details className="steps-card" open={activeThread.status === "STREAMING"}>
+                          <summary>
+                            <span>
+                              <ChevronDown size={16} />
+                              执行步骤
+                            </span>
+                            <small>{activeThread.steps.length}</small>
+                          </summary>
+                          <div className="step-list">
+                            {activeThread.steps.map((step) => (
+                              <div className={`step-row ${step.status}`} key={step.id}>
+                                {step.kind === "tool" ? <Wrench size={15} /> : <Clock3 size={15} />}
+                                <div>
+                                  <strong>{step.title}</strong>
+                                  <p>{step.error?.message ?? step.detail ?? step.outputSummary ?? step.inputSummary}</p>
+                                </div>
+                                <em>{step.status}</em>
                               </div>
-                            </li>
-                          ))}
-                        </ol>
-                        {activeThread.plan.risks.length > 0 && (
-                          <div className="risk-list">
-                            {activeThread.plan.risks.map((risk) => (
-                              <span key={risk.code}>{risk.message}</span>
                             ))}
                           </div>
-                        )}
-                      </div>
-                    )}
+                        </details>
+                      )}
 
-                    {activeThread.confirmation && activeThread.status === "READY_FOR_CONFIRMATION" && (
-                      <div className="confirmation-card">
-                        <div>
-                          <span className="artifact-kicker">待确认</span>
-                          <p>{activeThread.confirmation.summary}</p>
+                      {activeThread.plan && (
+                        <div className="plan-card">
+                          <div className="plan-card-header">
+                            <div>
+                              <span className="artifact-kicker">方案</span>
+                              <h3>{activeThread.plan.title}</h3>
+                            </div>
+                            <strong>{Math.round(activeThread.plan.totalDurationMinutes / 60)}h</strong>
+                          </div>
+                          <p>{activeThread.plan.summary}</p>
+                          <ol className="timeline-list">
+                            {activeThread.plan.timeline.map((step) => (
+                              <li key={step.id}>
+                                <time>
+                                  {step.startTime}-{step.endTime}
+                                </time>
+                                <div>
+                                  <strong>{step.title}</strong>
+                                  <span>{step.placeName ?? step.address ?? step.type}</span>
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                          {activeThread.plan.risks.length > 0 && (
+                            <div className="risk-list">
+                              {activeThread.plan.risks.map((risk) => (
+                                <span key={risk.code}>{risk.message}</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="action-list">
-                          {activeThread.confirmation.actions.map((action) => (
-                            <span key={action.id}>{actionLabel(action.type)}</span>
+                      )}
+
+                      {activeThread.confirmation && activeThread.status === "READY_FOR_CONFIRMATION" && (
+                        <div className="confirmation-card">
+                          <div>
+                            <span className="artifact-kicker">待确认</span>
+                            <p>{activeThread.confirmation.summary}</p>
+                          </div>
+                          <div className="action-list">
+                            {activeThread.confirmation.actions.map((action) => (
+                              <span key={action.id}>{actionLabel(action.type)}</span>
+                            ))}
+                          </div>
+                          <div className="confirmation-actions">
+                            <Button onClick={() => void sendMessage("确认，就按这个安排")}>
+                              <Check size={16} />
+                              确认并安排
+                            </Button>
+                            <Button variant="outline" onClick={() => setInput("我想调整一下：")}>
+                              调整方案
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {activeThread.receipts.length > 0 && (
+                        <div className="receipt-grid">
+                          {activeThread.receipts.map((receipt) => (
+                            <div className="receipt-card" key={receipt.id}>
+                              <ReceiptText size={16} />
+                              <div>
+                                <strong>{receipt.targetName}</strong>
+                                <span>
+                                  {receiptLabel(receipt.type)}
+                                  {receipt.time ? ` · ${receipt.time}` : ""}
+                                </span>
+                              </div>
+                              <em>{receipt.status}</em>
+                            </div>
                           ))}
                         </div>
-                        <div className="confirmation-actions">
-                          <Button onClick={() => void sendMessage("确认，就按这个安排")}>
-                            <Check size={16} />
-                            确认并安排
-                          </Button>
-                          <Button variant="outline" onClick={() => setInput("我想调整一下：")}>
-                            调整方案
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {activeThread.receipts.length > 0 && (
-                      <div className="receipt-grid">
-                        {activeThread.receipts.map((receipt) => (
-                          <div className="receipt-card" key={receipt.id}>
-                            <ReceiptText size={16} />
-                            <div>
-                              <strong>{receipt.targetName}</strong>
-                              <span>
-                                {receiptLabel(receipt.type)}
-                                {receipt.time ? ` · ${receipt.time}` : ""}
-                              </span>
-                            </div>
-                            <em>{receipt.status}</em>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </article>
-              )}
-            </div>
-          )}
-        </section>
-
-        <form
-          className="composer-wrap"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void sendMessage();
-          }}
-        >
-          <div className="composer">
-            <textarea
-              value={input}
-              placeholder="今天我能为你做些什么？"
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendMessage();
-                }
-              }}
-            />
-            <div className="composer-footer">
-              <div className="composer-tools">
-                <button type="button" onClick={() => setInput(familyPrompt)}>
-                  亲子
-                </button>
-                <button type="button" onClick={() => setInput(friendsPrompt)}>
-                  朋友
-                </button>
-                <span>
-                  <Utensils size={13} />
-                  Pro
-                </span>
+                      )}
+                    </div>
+                  </article>
+                )}
               </div>
-              {isStreaming ? (
-                <Button type="button" size="icon" variant="outline" aria-label="停止" onClick={stopStreaming}>
-                  <X size={16} />
-                </Button>
-              ) : (
-                <Button type="submit" size="icon" aria-label="发送" disabled={!canSend}>
-                  {isStreaming ? <Loader2 className="spin" size={16} /> : <ArrowUp size={16} />}
-                </Button>
-              )}
+            )}
+          </section>
+
+          <form
+            className="composer-wrap"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void sendMessage();
+            }}
+          >
+            <div className="composer">
+              <textarea
+                value={input}
+                placeholder="今天我能为你做些什么？"
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+              />
+              <div className="composer-footer">
+                <div className="composer-tools">
+                  <button type="button" onClick={() => setInput(familyPrompt)}>
+                    亲子
+                  </button>
+                  <button type="button" onClick={() => setInput(friendsPrompt)}>
+                    朋友
+                  </button>
+                  <span>
+                    <Utensils size={13} />
+                    Pro
+                  </span>
+                </div>
+                {isStreaming ? (
+                  <Button type="button" size="icon" variant="outline" aria-label="停止" onClick={stopStreaming}>
+                    <X size={16} />
+                  </Button>
+                ) : (
+                  <Button type="submit" size="icon" aria-label="发送" disabled={!canSend}>
+                    {isStreaming ? <Loader2 className="spin" size={16} /> : <ArrowUp size={16} />}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </form>
-      </main>
+          </form>
+        </main>
       </div>
     </>
   );

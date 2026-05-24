@@ -19,14 +19,16 @@ function message(id: string, role: AgentMessage["role"], content: string, create
   return { id, role, content, createdAt };
 }
 
-function createDraftSession(threadId: string, userMessage: string, now: string, existing?: AgentRunOutput): AgentRunOutput {
+function createDraftSession(
+  threadId: string,
+  userMessage: string,
+  now: string,
+  existing?: AgentRunOutput
+): AgentRunOutput {
   if (existing) {
     return {
       ...existing,
-      messages: [
-        ...existing.messages,
-        message(`msg_user_${Date.now()}`, "user", userMessage, now)
-      ]
+      messages: [...existing.messages, message(`msg_user_${Date.now()}`, "user", userMessage, now)]
     };
   }
 
@@ -62,7 +64,10 @@ function applyEvent(
         ? next.messages.map((item) =>
             item.id === event.messageId ? { ...item, content: item.content + event.delta } : item
           )
-        : [...next.messages, message(event.messageId, event.role === "assistant" ? "assistant" : "user", event.delta, event.timestamp)]
+        : [
+            ...next.messages,
+            message(event.messageId, event.role === "assistant" ? "assistant" : "user", event.delta, event.timestamp)
+          ]
     };
   }
 
@@ -143,9 +148,7 @@ export async function POST(request: Request) {
 
   const now = body.now ?? new Date().toISOString();
   const existingSession = body.threadId ? getSession(body.threadId) : undefined;
-  let session = body.threadId
-    ? createDraftSession(body.threadId, userMessage, now, existingSession)
-    : undefined;
+  let session = body.threadId ? createDraftSession(body.threadId, userMessage, now, existingSession) : undefined;
 
   const stream = new ReadableStream({
     async start(controller) {

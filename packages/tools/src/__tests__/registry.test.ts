@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { ExecutionReceiptSchema } from "@mh/shared";
+import { describe, expect, it } from "vitest";
 import { createDefaultToolRegistry, isToolExecutionError } from "../index";
 
 describe("tool registry", () => {
@@ -23,12 +23,14 @@ describe("tool registry", () => {
     const registry = createDefaultToolRegistry();
     const tool = registry.get("reserveRestaurant");
 
-    const receipt = ExecutionReceiptSchema.parse(await tool.invoke({
-      restaurantId: "qinghe-bistro",
-      partySize: 3,
-      time: "17:30",
-      contactName: "小明"
-    }));
+    const receipt = ExecutionReceiptSchema.parse(
+      await tool.invoke({
+        restaurantId: "qinghe-bistro",
+        partySize: 3,
+        time: "17:30",
+        contactName: "小明"
+      })
+    );
 
     expect(receipt).toMatchObject({
       type: "restaurant_reservation",

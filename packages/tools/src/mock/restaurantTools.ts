@@ -1,5 +1,5 @@
 import { restaurants } from "@mh/data";
-import { ExecutionReceiptSchema, type ExecutionReceipt } from "@mh/shared";
+import { type ExecutionReceipt, ExecutionReceiptSchema } from "@mh/shared";
 import { z } from "zod";
 import { ToolExecutionError } from "../errors";
 import { createAppTool } from "../registry";

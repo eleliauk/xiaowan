@@ -1,12 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
-import type {
-  AgentMessage,
-  ExecutionReceipt,
-  Plan,
-  ToolCallTrace,
-  ToolError,
-  UserGoal
-} from "@mh/shared";
+import type { AgentMessage, ExecutionReceipt, Plan, ToolCallTrace, ToolError, UserGoal } from "@mh/shared";
 
 export type PlanValidation = {
   isValid: boolean;

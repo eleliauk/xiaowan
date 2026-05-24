@@ -8,11 +8,7 @@ import {
   searchRestaurants,
   sendMessage
 } from "./mock/discoveryTools";
-import {
-  checkQueueTime,
-  checkRestaurantAvailability,
-  reserveRestaurant
-} from "./mock/restaurantTools";
+import { checkQueueTime, checkRestaurantAvailability, reserveRestaurant } from "./mock/restaurantTools";
 import { ToolRegistry } from "./registry";
 
 export * from "./errors";

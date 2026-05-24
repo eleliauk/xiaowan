@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { AgentStreamEvent, Plan } from "@mh/shared";
+import { describe, expect, it } from "vitest";
 import { applyClientEvent, createEmptyThread } from "./chatState";
 
 const base = {
@@ -68,7 +68,7 @@ describe("chat client event state", () => {
       type: "tool.started",
       toolCallId: "tool_1",
       toolName: "reserveRestaurant",
-      inputSummary: "{\"restaurantId\":\"qinghe-bistro\"}"
+      inputSummary: '{"restaurantId":"qinghe-bistro"}'
     });
     const withFinishedTool = applyClientEvent(withTool, {
       ...base,
@@ -76,7 +76,7 @@ describe("chat client event state", () => {
       toolCallId: "tool_1",
       toolName: "reserveRestaurant",
       status: "succeeded",
-      outputSummary: "{\"id\":\"receipt_1\"}"
+      outputSummary: '{"id":"receipt_1"}'
     });
     const withReceipt = applyClientEvent(withFinishedTool, {
       ...base,

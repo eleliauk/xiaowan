@@ -1,15 +1,16 @@
 import { familyMembers, friendMembers, homeLocation } from "@mh/data";
 import type { UserGoal } from "@mh/shared";
-import type { AgentGraphState } from "../state";
 import { message } from "../helpers";
+import type { AgentGraphState } from "../state";
 
 export async function parseGoal(state: AgentGraphState): Promise<Partial<AgentGraphState>> {
   const text = state.userMessage;
-  const scenario = text.includes("老婆") || text.includes("孩子")
-    ? "family"
-    : text.includes("朋友") || text.includes("4") || text.includes("四")
-      ? "friends"
-      : "unknown";
+  const scenario =
+    text.includes("老婆") || text.includes("孩子")
+      ? "family"
+      : text.includes("朋友") || text.includes("4") || text.includes("四")
+        ? "friends"
+        : "unknown";
 
   if (scenario === "unknown") {
     return {
