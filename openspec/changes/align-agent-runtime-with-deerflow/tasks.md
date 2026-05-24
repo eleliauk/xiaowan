@@ -33,9 +33,9 @@
 
 ## 5. Legacy and Documentation Cleanup
 
-- [ ] 5.1 Mark `/api/plan` and `/api/execute` as legacy compatibility or remove them after `/api/chat` parity tests pass.
-- [ ] 5.2 Delete or quarantine unused old planning nodes once the stream-first runtime covers their behavior.
-- [ ] 5.3 Update `docs/mvp-agent-loop-architecture.md` so it no longer presents `/api/plan`, `/api/execute`, or the old explicit planning graph as the primary architecture.
+- [x] 5.1 Remove `/api/plan` and `/api/execute` after `/api/chat` parity tests pass.
+- [x] 5.2 Delete or quarantine unused old planning nodes once the stream-first runtime covers their behavior.
+- [x] 5.3 Update `docs/mvp-agent-loop-architecture.md` so it no longer presents `/api/plan`, `/api/execute`, or the old explicit planning graph as the primary architecture.
 - [x] 5.4 Update OpenSpec tasks in related changes to point at this runtime boundary where they conflict.
 
 ## 6. Verification

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { executeActions } from "../nodes/executeActions";
-import type { AgentGraphState } from "../state";
+import type { AgentRuntimeState } from "../state";
 
 const now = "2026-05-24T12:00:00+08:00";
 
@@ -13,13 +13,10 @@ describe("executeActions", () => {
       status: "confirmed" as const,
       details: {}
     };
-    const state: AgentGraphState = {
+    const state: AgentRuntimeState = {
       sessionId: "thread_1",
-      mode: "execute_confirmed_plan",
       userMessage: "确认",
       now,
-      candidates: [],
-      plannedToolCalls: [],
       selectedPlan: {
         id: "plan_1",
         title: "亲子下午",
@@ -56,8 +53,6 @@ describe("executeActions", () => {
       },
       messages: [],
       toolTraces: [],
-      repairCount: 0,
-      loopCount: 0,
       executionReceipts: []
     };
 

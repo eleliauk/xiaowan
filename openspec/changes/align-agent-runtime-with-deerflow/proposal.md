@@ -32,7 +32,7 @@ This change defines a DeerFlow-lite runtime boundary for the Meituan demo. It co
   - A revision turn replans without executing old actions.
 - Retire the old architectural story:
   - `/api/chat` remains the frontend orchestration endpoint.
-  - `/api/plan` and `/api/execute` become temporary legacy compatibility only, then are removed or hidden from the UI.
+  - `/api/plan` and `/api/execute` are removed after chat API parity.
   - Old unused planning nodes are deleted or quarantined after the stream-first runtime covers their behavior.
 
 ## Capabilities

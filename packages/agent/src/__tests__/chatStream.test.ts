@@ -1,6 +1,7 @@
-import type { AgentStreamEvent } from "@mh/shared";
+import type { AgentStreamEvent, Plan } from "@mh/shared";
 import { describe, expect, it } from "vitest";
-import { runChatTurn, runPlanning } from "../index";
+import { runChatTurn } from "../index";
+import type { ThreadState } from "../runtime";
 
 const now = "2026-05-24T12:00:00+08:00";
 
@@ -12,6 +13,34 @@ async function collect(input: Parameters<typeof runChatTurn>[0]) {
     events.push(event);
   }
   return events;
+}
+
+function planFrom(events: AgentStreamEvent[]): Plan {
+  const event = events.find((item) => item.type === "plan.updated");
+  if (event?.type !== "plan.updated") {
+    throw new Error("Expected plan.updated event");
+  }
+  return event.plan;
+}
+
+function threadWithPlan(threadId: string, plan: Plan): ThreadState {
+  return {
+    threadId,
+    title: plan.title,
+    status: "READY_FOR_CONFIRMATION",
+    messages: [],
+    events: [],
+    toolTraces: [],
+    plan,
+    pendingConfirmation: {
+      planId: plan.id,
+      summary: plan.summary,
+      actions: plan.requiredActions
+    },
+    receipts: [],
+    createdAt: now,
+    updatedAt: now
+  };
 }
 
 describe("runChatTurn", () => {
@@ -32,15 +61,17 @@ describe("runChatTurn", () => {
   });
 
   it("streams confirmed execution receipts through the same chat runner", async () => {
-    const planned = await runPlanning({
-      userMessage: "今天下午是空的，想和老婆孩子出去玩几个小时，别离家太远，帮我安排一下。",
+    const planningEvents = await collect({
+      message: "今天下午是空的，想和老婆孩子出去玩几个小时，别离家太远，帮我安排一下。",
       now
     });
+    const threadId = planningEvents[0]?.threadId ?? "thread_family";
+    const plan = planFrom(planningEvents);
 
     const events = await collect({
-      threadId: planned.sessionId,
+      threadId,
       message: "确认，就按这个安排",
-      existingSession: planned,
+      existingThread: threadWithPlan(threadId, plan),
       now
     });
 

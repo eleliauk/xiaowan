@@ -561,7 +561,6 @@ export function createLocalActivityAgent(): LocalActivityAgent {
         message: input.message,
         clientRunId: input.clientRunId,
         existingThread: input.existingThread,
-        existingSession: input.existingThread ? threadToAgentRunOutput(input.existingThread) : undefined,
         now: input.now,
         llmClient: input.llmClient
       });

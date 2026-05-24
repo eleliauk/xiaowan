@@ -19,7 +19,7 @@ Gateway route
   validates input and streams output
 ```
 
-The current MVP has pieces of this shape, but the responsibilities are still blended.
+The MVP now uses this shape directly. The earlier `runPlanning()` / `executePlan()` / LangGraph wrapper path has been removed from `@mh/agent` and the legacy `/api/plan` and `/api/execute` routes have been deleted.
 
 ## Current Runtime Shape
 
@@ -29,35 +29,24 @@ Browser
   ▼
 POST /api/chat
   │
-  ├─ route loads/saves session Map
-  ├─ route applies stream events back into session
+  ├─ validate body
+  ├─ create/resume thread
+  ├─ create/reuse run
+  └─ return SSE consumer from StreamBridge.subscribe(runId)
+
+Runtime producer
   │
   ▼
-runChatTurn()
-  │
-  ├─ if regex says "confirm", run executePlan()
-  │
-  └─ otherwise await runPlanning()
-          │
-          ▼
-      graph.invoke()
-          │
-          ▼
-      runReActPlanning()
-          ├─ model tool loop
-          ├─ registry tool calls
-          └─ final Plan JSON
-  │
-  ▼
-replay events from AgentRunOutput
+LocalActivityRuntime.startTurn()
+  ├─ ThreadStore appends user message and applies stream events
+  ├─ RunManager tracks status, idempotency, and abort
+  ├─ LocalActivityAgent.streamTurn()
+  │    ├─ runReActPlanning() for planning/tool use/fallback
+  │    └─ executeActions() only for confirmed pending actions
+  └─ StreamBridge.publish(runId, event)
 ```
 
-The oddness comes from two mismatches:
-
-- The stream is not the runtime source of truth; it is mostly a projection after planning.
-- The graph is not the runtime source of truth either; the real loop is hidden in one node.
-
-## Target Runtime Shape
+## Runtime Shape Target
 
 ```text
 Browser
@@ -88,23 +77,9 @@ RunManager.start(threadId, userTurn)
       StreamBridge.publish(runId, event)
 ```
 
-The runtime can still use LangGraph.js, but graph boundaries must match reality:
+The runtime uses one agent loop with explicit event hooks:
 
 ```text
-Option A: explicit graph nodes
-
-START
-  -> interpretTurn
-  -> planWithNativeTools
-  -> validatePlan
-  -> waitForConfirmation
-  -> executeConfirmedActions
-  -> finalize
-  -> END
-
-
-Option B: one agent loop with explicit event hooks
-
 LocalActivityAgent.streamTurn()
   -> publish agent.step
   -> model turn
@@ -116,9 +91,7 @@ LocalActivityAgent.streamTurn()
   -> publish confirmation.required
 ```
 
-Either option is acceptable for the hackathon MVP. What is not acceptable is claiming a stream-first architecture while `runChatTurn()` blocks on `runPlanning()` and then reconstructs events after the fact.
-
-Decision for this change: keep Option B for the MVP. The ReAct loop remains the native tool-calling runner, and runtime boundaries are made explicit with `agent.step`, `tool.started`, `tool.finished`, `plan.updated`, `confirmation.required`, `execution.receipt`, and terminal run events. This avoids a broad graph rewrite while aligning the observable architecture with the actual execution path.
+Decision for this change: keep the instrumented ReAct loop for the MVP and remove the unused LangGraph wrapper. Runtime boundaries are made explicit with `agent.step`, `tool.started`, `tool.finished`, `plan.updated`, `confirmation.required`, `execution.receipt`, and terminal run events.
 
 ## Runtime Components
 
@@ -219,23 +192,11 @@ The existing `@mh/tools` registry remains the only mock-data boundary. The runti
 
 ## Legacy Route Strategy
 
-`/api/plan` and `/api/execute` should stop being part of the product architecture.
-
-Near-term options:
-
-- Keep routes only for compatibility tests and mark them legacy.
-- Reimplement them as thin wrappers around the same runtime if needed.
-- Remove frontend usage completely.
-
-Final target:
+`/api/plan` and `/api/execute` have been removed from the product architecture.
 
 ```text
 Frontend orchestration endpoints:
   POST /api/chat
-
-Legacy internal or deleted:
-  POST /api/plan
-  POST /api/execute
 ```
 
 ## Migration Path
@@ -247,8 +208,8 @@ Legacy internal or deleted:
 5. Emit tool and step events during the ReAct loop.
 6. Replace regex confirmation with pending confirmation state.
 7. Slim `/api/chat` down to request validation plus SSE subscription.
-8. Mark or remove legacy plan/execute routes.
-9. Update old architecture docs that still describe `/api/plan` and explicit planning graph as the primary path.
+8. Remove legacy plan/execute routes.
+9. Update old architecture docs that described `/api/plan` and explicit planning graph as the primary path.
 
 ## Risks
 

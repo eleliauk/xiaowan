@@ -63,14 +63,14 @@ The system SHALL keep local-activity domain behavior in typed tools and agent po
 - **THEN** it sends a chat message and renders stream events without calling separate plan or execute orchestration APIs
 
 ### Requirement: Retire legacy plan and execute orchestration
-The system SHALL treat `/api/plan` and `/api/execute` as legacy compatibility surfaces after the chat runtime is available.
+The system SHALL remove `/api/plan` and `/api/execute` from the product runtime after chat API parity is available.
 
 #### Scenario: Frontend uses only chat orchestration
 - **GIVEN** the chat workspace runs a family or friends demo flow
 - **WHEN** the frontend submits initial planning, revision, or confirmation turns
 - **THEN** it calls `/api/chat` only
 
-#### Scenario: Legacy routes do not define runtime architecture
-- **GIVEN** `/api/plan` or `/api/execute` still exists temporarily
-- **WHEN** implementation or documentation describes the primary architecture
-- **THEN** those routes are marked legacy or compatibility wrappers and are not presented as the main flow
+#### Scenario: Legacy routes are absent from the runtime
+- **GIVEN** implementation or documentation describes the primary architecture
+- **WHEN** frontend orchestration endpoints are listed
+- **THEN** `/api/chat` is the only product orchestration endpoint

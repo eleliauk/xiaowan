@@ -163,20 +163,22 @@ type RunChatTurnInput = {
 type RunChatTurnOutput = AsyncIterable<AgentStreamEvent>;
 ```
 
-The internal graph can still keep distinct nodes:
+The agent package no longer keeps the old explicit LangGraph node chain. Runtime phases are represented as streamed events from the instrumented runner:
 
 ```text
-parseGoal
-  -> planCandidates
-  -> callDiscoveryTools
-  -> verifyAndRepair
-  -> composeConfirmation
-  -> waitForConfirmation
-  -> executeActions
-  -> composeFinalShareMessage
+LocalActivityAgent.streamTurn()
+  -> intent agent.step
+  -> runReActPlanning()
+  -> tool.started / tool.finished
+  -> verification / repair agent.step
+  -> plan.updated
+  -> confirmation.required
+  -> executeActions() after confirmation
+  -> execution.receipt
+  -> run.completed / run.failed
 ```
 
-But those nodes are no longer exposed as separate browser actions. They only emit typed stream events.
+The browser still sees only `/api/chat` and typed stream events.
 
 ## UI Rendering Model
 
@@ -204,7 +206,7 @@ Rendering rules:
 4. Add `/api/chat` and tests for SSE framing.
 5. Replace `Workbench` with `ChatWorkspace`.
 6. Remove direct frontend dependencies on `/api/plan` and `/api/execute`.
-7. Keep old route tests only until chat API parity is verified, then delete or mark legacy.
+7. Delete old route tests and legacy `/api/plan` and `/api/execute` routes after chat API parity is verified.
 
 ## Error Handling
 

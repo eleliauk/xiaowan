@@ -27,7 +27,7 @@
 - [x] 4.2 Encode each `AgentStreamEvent` as an SSE frame with stable event names and JSON payloads.
 - [x] 4.3 Add abort handling so client disconnects cancel unconfirmed planning work safely.
 - [x] 4.4 Add API tests for family planning, friends repair path, confirmation-required state, confirmed execution receipts, and normalized failures.
-- [x] 4.5 Remove React UI calls to `/api/plan` and `/api/execute`; keep those routes only as temporary legacy routes if tests still depend on them.
+- [x] 4.5 Remove React UI calls to `/api/plan` and `/api/execute`; delete those legacy routes after chat API parity tests pass.
 
 ## 5. Thread History and Workspace State
 

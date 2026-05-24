@@ -1,12 +1,11 @@
 import type { LLMClient } from "@mh/llm";
-import { type AgentRunOutput, type AgentStreamEvent, AgentStreamEventSchema, type Plan } from "@mh/shared";
-import { toExecutionResponse, toPlanningResponse } from "./adapters/toApiResponse";
+import type { AgentRunState, AgentStreamEvent, Plan } from "@mh/shared";
+import { AgentStreamEventSchema } from "@mh/shared";
 import { createId } from "./helpers";
 import { executeActions } from "./nodes/executeActions";
 import { runReActPlanning } from "./nodes/runReActPlanning";
-import { waitForConfirmation } from "./nodes/waitForConfirmation";
 import type { ThreadState } from "./runtime";
-import type { AgentGraphState } from "./state";
+import type { AgentRuntimeState } from "./state";
 
 export type RunChatTurnInput = {
   runId?: string;
@@ -14,7 +13,6 @@ export type RunChatTurnInput = {
   message: string;
   now: string;
   clientRunId?: string;
-  existingSession?: AgentRunOutput;
   existingThread?: ThreadState;
   llmClient?: LLMClient;
 };
@@ -27,26 +25,18 @@ function isConfirmationTurn(input: RunChatTurnInput) {
     return false;
   }
 
-  if (input.existingThread) {
-    return (
-      input.existingThread.status === "READY_FOR_CONFIRMATION" &&
-      Boolean(input.existingThread.pendingConfirmation) &&
-      Boolean(input.existingThread.plan)
-    );
-  }
-
-  return input.existingSession?.state === "READY_FOR_CONFIRMATION" && Boolean(input.existingSession.plan);
+  return (
+    input.existingThread?.status === "READY_FOR_CONFIRMATION" &&
+    Boolean(input.existingThread.pendingConfirmation) &&
+    Boolean(input.existingThread.plan)
+  );
 }
 
 function confirmedPlan(input: RunChatTurnInput): Plan {
-  if (input.existingThread?.plan && input.existingThread.pendingConfirmation) {
-    return {
-      ...input.existingThread.plan,
-      requiredActions: input.existingThread.pendingConfirmation.actions
-    };
-  }
-
-  return input.existingSession!.plan!;
+  return {
+    ...input.existingThread!.plan!,
+    requiredActions: input.existingThread!.pendingConfirmation!.actions
+  };
 }
 
 function base(runId: string, threadId: string, timestamp: string) {
@@ -102,24 +92,40 @@ function createEventQueue() {
 function createBaseState(
   input: RunChatTurnInput,
   threadId: string,
-  streamContext: AgentGraphState["streamContext"],
-  eventSink: AgentGraphState["eventSink"]
-): AgentGraphState {
+  streamContext: AgentRuntimeState["streamContext"],
+  eventSink: AgentRuntimeState["eventSink"]
+): AgentRuntimeState {
   return {
     sessionId: threadId,
-    mode: "plan_only",
     userMessage: input.message,
     now: input.now,
     streamContext,
     eventSink,
     llmClient: input.llmClient,
-    candidates: [],
-    plannedToolCalls: [],
     messages: [],
     toolTraces: [],
-    repairCount: 0,
-    loopCount: 0,
     executionReceipts: []
+  };
+}
+
+function planningState(state: AgentRuntimeState): AgentRunState {
+  return state.error ? "PARTIAL_FAILURE" : state.needsUserInput ? "WAITING_FOR_USER" : "READY_FOR_CONFIRMATION";
+}
+
+function executionState(state: AgentRuntimeState): AgentRunState {
+  const hasFailedRequiredAction =
+    state.selectedPlan?.requiredActions.some((action) => action.status === "failed" && !action.optional) ?? true;
+
+  return hasFailedRequiredAction ? "PARTIAL_FAILURE" : "DONE";
+}
+
+function pendingPlan(plan: Plan): Plan {
+  return {
+    ...plan,
+    requiredActions: plan.requiredActions.map((action) => ({
+      ...action,
+      status: "pending"
+    }))
   };
 }
 
@@ -150,44 +156,39 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
           }
         });
 
-        const state: AgentGraphState = {
+        const state: AgentRuntimeState = {
           sessionId: threadId,
-          mode: "execute_confirmed_plan",
           userMessage: input.message,
           now: input.now,
           streamContext,
           eventSink,
-          candidates: [],
-          plannedToolCalls: [],
           selectedPlan: plan,
-          confirmedPlanId: plan.id,
           messages: [],
           toolTraces: [],
-          repairCount: 0,
-          loopCount: 0,
           executionReceipts: []
         };
         const updates = await executeActions(state);
-        const executed = toExecutionResponse({
+        const executedState = {
           ...state,
           ...updates
-        });
+        };
+        const runState = executionState(executedState);
 
         /*
          * executeActions emits tool and receipt events through eventSink as each
-         * action completes; the response object is only used for final state.
+         * action completes; the merged state is only used for terminal state.
          */
         queue.push({
           ...streamContext,
           type: "agent.step",
           phase: "execution",
           title: "执行已确认安排",
-          status: executed.state === "DONE" ? "succeeded" : "failed",
-          detail: executed.state,
+          status: runState === "DONE" ? "succeeded" : "failed",
+          detail: runState,
           display: {
-            title: executed.state === "DONE" ? "执行完成" : "执行部分失败",
-            summary: executed.state,
-            severity: executed.state === "DONE" ? "success" : "warning",
+            title: runState === "DONE" ? "执行完成" : "执行部分失败",
+            summary: runState,
+            severity: runState === "DONE" ? "success" : "warning",
             artifactRef: "receipts"
           }
         });
@@ -195,7 +196,7 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
         queue.push({
           ...streamContext,
           type: "run.completed",
-          state: executed.state
+          state: runState
         });
         queue.end();
         return;
@@ -238,15 +239,12 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
 
       const baseState = createBaseState(input, threadId, streamContext, eventSink);
       const planningUpdates = await runReActPlanning(baseState);
-      const confirmationUpdates = await waitForConfirmation({
-        ...baseState,
-        ...planningUpdates
-      });
-      const planned = toPlanningResponse({
+      const planned = {
         ...baseState,
         ...planningUpdates,
-        ...confirmationUpdates
-      });
+        selectedPlan: planningUpdates.selectedPlan ? pendingPlan(planningUpdates.selectedPlan) : undefined
+      };
+      const runState = planningState(planned);
 
       queue.push({
         ...streamContext,
@@ -254,10 +252,10 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
         phase: "planning",
         title: "规划本地短时活动",
         status: planned.error ? "failed" : "succeeded",
-        detail: planned.plan?.summary ?? planned.needsUserInput?.question,
+        detail: planned.selectedPlan?.summary ?? planned.needsUserInput?.question,
         display: {
           title: planned.error ? "规划未完成" : "规划完成",
-          summary: planned.plan?.summary ?? planned.needsUserInput?.question,
+          summary: planned.selectedPlan?.summary ?? planned.needsUserInput?.question,
           severity: planned.error ? "error" : "success",
           artifactRef: planned.error ? "diagnostics" : "plan"
         }
@@ -298,20 +296,20 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
         return;
       }
 
-      if (planned.plan) {
+      if (planned.selectedPlan) {
         queue.push({
           ...streamContext,
           type: "plan.updated",
-          plan: planned.plan,
+          plan: planned.selectedPlan,
           display: {
-            title: planned.plan.title,
-            summary: planned.plan.summary,
+            title: planned.selectedPlan.title,
+            summary: planned.selectedPlan.summary,
             items: [
-              { label: "时长", value: `${Math.round(planned.plan.totalDurationMinutes / 60)} 小时` },
-              { label: "预算", value: `${planned.plan.estimatedBudgetCny} 元` },
-              { label: "置信度", value: `${Math.round(planned.plan.confidence * 100)}%` }
+              { label: "时长", value: `${Math.round(planned.selectedPlan.totalDurationMinutes / 60)} 小时` },
+              { label: "预算", value: `${planned.selectedPlan.estimatedBudgetCny} 元` },
+              { label: "置信度", value: `${Math.round(planned.selectedPlan.confidence * 100)}%` }
             ],
-            severity: planned.plan.risks.some((risk) => risk.severity !== "info") ? "warning" : "success",
+            severity: planned.selectedPlan.risks.some((risk) => risk.severity !== "info") ? "warning" : "success",
             artifactRef: "plan"
           }
         });
@@ -319,13 +317,13 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
         queue.push({
           ...streamContext,
           type: "confirmation.required",
-          planId: planned.plan.id,
-          summary: planned.plan.summary,
-          actions: planned.plan.requiredActions,
+          planId: planned.selectedPlan.id,
+          summary: planned.selectedPlan.summary,
+          actions: planned.selectedPlan.requiredActions,
           display: {
             title: "等待确认",
-            summary: planned.plan.summary,
-            items: planned.plan.requiredActions.map((action) => ({
+            summary: planned.selectedPlan.summary,
+            items: planned.selectedPlan.requiredActions.map((action) => ({
               label: action.type,
               value: action.toolName,
               status: action.status
@@ -339,22 +337,22 @@ export async function* runChatTurn(input: RunChatTurnInput): AsyncIterable<Agent
       queue.push({
         ...streamContext,
         type: "agent.step",
-        phase: planned.state === "READY_FOR_CONFIRMATION" ? "confirmation" : "final",
-        title: planned.state === "READY_FOR_CONFIRMATION" ? "等待用户确认" : "完成本轮",
+        phase: runState === "READY_FOR_CONFIRMATION" ? "confirmation" : "final",
+        title: runState === "READY_FOR_CONFIRMATION" ? "等待用户确认" : "完成本轮",
         status: "succeeded",
-        detail: planned.state,
+        detail: runState,
         display: {
-          title: planned.state === "READY_FOR_CONFIRMATION" ? "等待用户确认" : "完成本轮",
-          summary: planned.state,
+          title: runState === "READY_FOR_CONFIRMATION" ? "等待用户确认" : "完成本轮",
+          summary: runState,
           severity: "success",
-          artifactRef: planned.state === "READY_FOR_CONFIRMATION" ? "confirmation" : undefined
+          artifactRef: runState === "READY_FOR_CONFIRMATION" ? "confirmation" : undefined
         }
       });
 
       queue.push({
         ...streamContext,
         type: "run.completed",
-        state: planned.state
+        state: runState
       });
       queue.end();
     } catch (error) {

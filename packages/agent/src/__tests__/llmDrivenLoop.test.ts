@@ -10,9 +10,16 @@ import type {
   ToolPlanningInput,
   VerifyPlanInput
 } from "@mh/llm";
-import type { Plan, PlannedToolCall, PlanValidationDecision, RepairDecision, ToolPlanningDecision } from "@mh/shared";
+import type {
+  AgentStreamEvent,
+  Plan,
+  PlannedToolCall,
+  PlanValidationDecision,
+  RepairDecision,
+  ToolPlanningDecision
+} from "@mh/shared";
 import { describe, expect, it } from "vitest";
-import { runChatTurn, runPlanning } from "../index";
+import { runChatTurn } from "../index";
 
 const now = "2026-05-24T12:00:00+08:00";
 
@@ -317,7 +324,7 @@ class ScriptedReActLLMClient implements LLMClient {
   }
 
   async parseGoal(): Promise<ParsedGoalHint> {
-    throw new Error("parseGoal should not be used by the ReAct planning graph");
+    throw new Error("parseGoal should not be used by the ReAct planning loop");
   }
 
   async draftAssistantReply(input: DraftAssistantReplyInput) {
@@ -325,19 +332,19 @@ class ScriptedReActLLMClient implements LLMClient {
   }
 
   async planToolCalls(_input: ToolPlanningInput): Promise<ToolPlanningDecision> {
-    throw new Error("planToolCalls should not be used by the ReAct planning graph");
+    throw new Error("planToolCalls should not be used by the ReAct planning loop");
   }
 
   async composePlan(_input: ComposePlanInput): Promise<Plan> {
-    throw new Error("composePlan should not be used by the ReAct planning graph");
+    throw new Error("composePlan should not be used by the ReAct planning loop");
   }
 
   async verifyPlan(_input: VerifyPlanInput): Promise<PlanValidationDecision> {
-    throw new Error("verifyPlan should not be used by the ReAct planning graph");
+    throw new Error("verifyPlan should not be used by the ReAct planning loop");
   }
 
   async repairPlan(input: RepairPlanInput): Promise<RepairDecision> {
-    throw new Error(`repairPlan should not be used by the ReAct planning graph: ${input.validation.reasonSummary}`);
+    throw new Error(`repairPlan should not be used by the ReAct planning loop: ${input.validation.reasonSummary}`);
   }
 }
 
@@ -387,11 +394,25 @@ class UnsafePlanLLMClient extends ScriptedReActLLMClient {
 }
 
 async function collectEvents(input: Parameters<typeof runChatTurn>[0]) {
-  const events = [];
+  const events: AgentStreamEvent[] = [];
   for await (const event of runChatTurn(input)) {
     events.push(event);
   }
   return events;
+}
+
+function planFrom(events: AgentStreamEvent[]): Plan | undefined {
+  const event = events.find((item) => item.type === "plan.updated");
+  return event?.type === "plan.updated" ? event.plan : undefined;
+}
+
+function terminalState(events: AgentStreamEvent[]) {
+  const terminal = events.at(-1);
+  return terminal?.type === "run.completed"
+    ? terminal.state
+    : terminal?.type === "run.failed"
+      ? "PARTIAL_FAILURE"
+      : undefined;
 }
 
 describe("LLM-driven agent loop", () => {
@@ -405,20 +426,22 @@ describe("LLM-driven agent loop", () => {
       finalTurn(familyPlan(), "收到，我会查活动、餐厅和排队情况后给出一键安排。")
     ]);
 
-    const result = await runPlanning({
-      userMessage: "今天下午想和老婆孩子出去玩几个小时，别太远。",
+    const events = await collectEvents({
+      message: "今天下午想和老婆孩子出去玩几个小时，别太远。",
       now,
       llmClient
     });
+    const plan = planFrom(events);
+    const toolEvents = events.filter((event) => event.type === "tool.finished");
 
-    expect(result.state).toBe("READY_FOR_CONFIRMATION");
-    expect(result.plan?.id).toBe("llm-family-pottery-light-meal");
-    expect(result.plan?.id).not.toMatch(/family-steady|plan-family/);
-    expect(result.toolTraces.map((trace) => trace.toolName)).toEqual(familyToolCalls.map((call) => call.toolName));
+    expect(terminalState(events)).toBe("READY_FOR_CONFIRMATION");
+    expect(plan?.id).toBe("llm-family-pottery-light-meal");
+    expect(plan?.id).not.toMatch(/family-steady|plan-family/);
+    expect(toolEvents.map((event) => event.toolName)).toEqual(familyToolCalls.map((call) => call.toolName));
     expect(llmClient.toolInputs[0]?.tools.map((tool) => tool.function.name)).toContain("searchNearbyActivities");
     expect(llmClient.toolInputs[0]?.tools.map((tool) => tool.function.name)).not.toContain("reserveRestaurant");
     expect(llmClient.toolInputs[1]?.messages.some((item) => item.role === "tool")).toBe(true);
-    expect(result.executionReceipts).toHaveLength(0);
+    expect(events.some((event) => event.type === "execution.receipt")).toBe(false);
   });
 
   it("repairs a friends plan through ReAct observations instead of hard-coded agent repair", async () => {
@@ -440,53 +463,65 @@ describe("LLM-driven agent loop", () => {
       finalTurn(repairedFriendsPlan())
     ]);
 
-    const result = await runPlanning({
-      userMessage: "今天下午我们 4 个朋友，2 男 2 女，想玩几个小时再吃饭，别太远。",
+    const events = await collectEvents({
+      message: "今天下午我们 4 个朋友，2 男 2 女，想玩几个小时再吃饭，别太远。",
       now,
       llmClient
     });
-
-    const failedTrace = result.toolTraces.find(
-      (trace) => trace.toolName === "checkRestaurantAvailability" && trace.status === "failed"
+    const plan = planFrom(events);
+    const failedTool = events.find(
+      (event) =>
+        event.type === "tool.finished" && event.toolName === "checkRestaurantAvailability" && event.status === "failed"
     );
 
-    expect(result.state).toBe("READY_FOR_CONFIRMATION");
-    expect(failedTrace?.error?.code).toBe("NO_AVAILABILITY");
+    expect(terminalState(events)).toBe("READY_FOR_CONFIRMATION");
+    expect(failedTool).toMatchObject({ type: "tool.finished", error: { code: "NO_AVAILABILITY" } });
     expect(
       llmClient.toolInputs[1]?.messages.some((item) => item.role === "tool" && item.content.includes("NO_AVAILABILITY"))
     ).toBe(true);
-    expect(result.plan?.id).toBe("llm-friends-exhibit-neon-repaired");
-    expect(result.plan?.timeline.some((step) => step.type === "meal" && step.startTime === "18:30")).toBe(true);
-    expect(result.plan?.risks.some((risk) => risk.code === "REPAIRED_RESTAURANT_TIME")).toBe(true);
+    expect(plan?.id).toBe("llm-friends-exhibit-neon-repaired");
+    expect(plan?.timeline.some((step) => step.type === "meal" && step.startTime === "18:30")).toBe(true);
+    expect(plan?.risks.some((risk) => risk.code === "REPAIRED_RESTAURANT_TIME")).toBe(true);
   });
 
   it("fails the run when the LLM selects a tool outside the registry", async () => {
-    const result = await runPlanning({
-      userMessage: "今天下午想和老婆孩子出去玩几个小时，别太远。",
+    const events = await collectEvents({
+      message: "今天下午想和老婆孩子出去玩几个小时，别太远。",
       now,
       llmClient: new IllegalToolLLMClient()
     });
 
-    expect(result.state).toBe("PARTIAL_FAILURE");
-    expect(result.plan).toBeUndefined();
-    expect(result.toolTraces).toEqual([
-      expect.objectContaining({
-        toolName: "deleteEverything",
-        status: "failed",
-        error: expect.objectContaining({ code: "VALIDATION_ERROR" })
-      })
-    ]);
+    expect(terminalState(events)).toBe("PARTIAL_FAILURE");
+    expect(planFrom(events)).toBeUndefined();
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "tool.finished",
+          toolName: "deleteEverything",
+          status: "failed",
+          error: expect.objectContaining({ code: "VALIDATION_ERROR" })
+        })
+      ])
+    );
   });
 
   it("rejects unsafe LLM plans that claim execution receipts before confirmation", async () => {
-    const result = await runPlanning({
-      userMessage: "今天下午想和老婆孩子出去玩几个小时，别太远。",
+    const events = await collectEvents({
+      message: "今天下午想和老婆孩子出去玩几个小时，别太远。",
       now,
       llmClient: new UnsafePlanLLMClient()
     });
 
-    expect(result.state).toBe("PARTIAL_FAILURE");
-    expect(result.plan).toBeUndefined();
+    expect(terminalState(events)).toBe("PARTIAL_FAILURE");
+    expect(planFrom(events)).toBeUndefined();
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "run.failed",
+          error: expect.objectContaining({ code: "VALIDATION_ERROR" })
+        })
+      ])
+    );
   });
 
   it("asks the ReAct model to repair invalid final plan JSON before failing the run", async () => {
@@ -508,14 +543,15 @@ describe("LLM-driven agent loop", () => {
       finalTurn(familyPlan(), "已修正为完整可执行方案。")
     ]);
 
-    const result = await runPlanning({
-      userMessage: "今天下午想和老婆孩子出去玩几个小时，别太远。",
+    const events = await collectEvents({
+      message: "今天下午想和老婆孩子出去玩几个小时，别太远。",
       now,
       llmClient
     });
+    const plan = planFrom(events);
 
-    expect(result.state).toBe("READY_FOR_CONFIRMATION");
-    expect(result.plan?.id).toBe("llm-family-pottery-light-meal");
+    expect(terminalState(events)).toBe("READY_FOR_CONFIRMATION");
+    expect(plan?.id).toBe("llm-family-pottery-light-meal");
     expect(
       llmClient.toolInputs
         .at(-1)

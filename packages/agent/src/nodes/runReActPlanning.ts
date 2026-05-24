@@ -4,7 +4,7 @@ import { createDefaultToolRegistry, toOpenAIToolDefinition } from "@mh/tools";
 import { z } from "zod";
 import { stableStringify, toolFinishedDisplay, toolStartedDisplay } from "../display";
 import { createId, message, tracedToolCall } from "../helpers";
-import type { AgentGraphState } from "../state";
+import type { AgentRuntimeState } from "../state";
 
 const MAX_REACT_LOOPS = 8;
 
@@ -140,7 +140,7 @@ function scenarioFromMessage(userMessage: string): "family" | "friends" {
     : "family";
 }
 
-function buildFallbackPlan(state: AgentGraphState, traces: ToolCallTrace[]): Plan | undefined {
+function buildFallbackPlan(state: AgentRuntimeState, traces: ToolCallTrace[]): Plan | undefined {
   const scenario = scenarioFromMessage(state.userMessage);
   const activity = asRecord(firstOutputItem(traces, "searchNearbyActivities"));
   const restaurant = asRecord(firstOutputItem(traces, "searchRestaurants"));
@@ -300,7 +300,7 @@ function fallbackAssistantText(plan?: Plan, content?: string) {
   return plan?.summary ?? "我已经完成了本地活动规划，请确认后执行预约和发送消息。";
 }
 
-async function emitToolStarted(state: AgentGraphState, call: NativeToolCall) {
+async function emitToolStarted(state: AgentRuntimeState, call: NativeToolCall) {
   if (!state.eventSink || !state.streamContext) {
     return;
   }
@@ -315,7 +315,7 @@ async function emitToolStarted(state: AgentGraphState, call: NativeToolCall) {
   });
 }
 
-async function emitToolFinished(state: AgentGraphState, trace: ToolCallTrace) {
+async function emitToolFinished(state: AgentRuntimeState, trace: ToolCallTrace) {
   if (!state.eventSink || !state.streamContext) {
     return;
   }
@@ -333,7 +333,7 @@ async function emitToolFinished(state: AgentGraphState, trace: ToolCallTrace) {
 }
 
 async function emitAgentStep(
-  state: AgentGraphState,
+  state: AgentRuntimeState,
   phase: "tooling" | "verification" | "repair",
   title: string,
   status: "running" | "succeeded" | "failed" | "skipped",
@@ -358,7 +358,7 @@ async function emitAgentStep(
   });
 }
 
-export async function runReActPlanning(state: AgentGraphState): Promise<Partial<AgentGraphState>> {
+export async function runReActPlanning(state: AgentRuntimeState): Promise<Partial<AgentRuntimeState>> {
   const client = state.llmClient ?? createLLMClient();
   const registry = createDefaultToolRegistry();
   const planningTools = registry
@@ -407,8 +407,6 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
 
         if (final.status === "need_clarification") {
           return {
-            llmTrace: { provider: client.provider },
-            loopCount: loop + 1,
             toolTraces: traces,
             needsUserInput: {
               question: final.clarificationQuestion ?? assistantText
@@ -420,8 +418,6 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
         if (final.status !== "ready" || !final.plan) {
           await emitAgentStep(state, "verification", "校验方案结构", "failed", final.reasonSummary);
           return {
-            llmTrace: { provider: client.provider },
-            loopCount: loop + 1,
             toolTraces: traces,
             messages: [message("user", state.userMessage, state.now), message("assistant", assistantText, state.now)],
             error: {
@@ -436,8 +432,6 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
         if (unsafeReason) {
           await emitAgentStep(state, "verification", "校验方案结构", "failed", unsafeReason);
           return {
-            llmTrace: { provider: client.provider },
-            loopCount: loop + 1,
             toolTraces: traces,
             selectedPlan: undefined,
             messages: [message("user", state.userMessage, state.now), message("assistant", assistantText, state.now)],
@@ -451,16 +445,8 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
 
         await emitAgentStep(state, "verification", "校验方案结构", "succeeded", final.reasonSummary);
         return {
-          llmTrace: { provider: client.provider },
-          loopCount: loop + 1,
           toolTraces: traces,
           selectedPlan: final.plan,
-          planValidation: {
-            isValid: true,
-            blockingIssues: [],
-            confidence: final.plan.confidence,
-            reasonSummary: final.reasonSummary ?? "ReAct loop produced a plan from tool observations."
-          },
           messages: [message("user", state.userMessage, state.now), message("assistant", assistantText, state.now)]
         };
       }
@@ -479,8 +465,6 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
           const failedTrace = failedToolTrace(toolCall, `LLM selected unknown planning tool: ${toolCall.name}`);
           await emitToolFinished(state, failedTrace);
           return {
-            llmTrace: { provider: client.provider },
-            loopCount: loop + 1,
             toolTraces: [...traces, failedTrace],
             messages: [
               message("user", state.userMessage, state.now),
@@ -534,8 +518,6 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
 
         if (trace.error && !trace.error.recoverable) {
           return {
-            llmTrace: { provider: client.provider },
-            loopCount: loop + 1,
             toolTraces: traces,
             messages: [
               message("user", state.userMessage, state.now),
@@ -552,16 +534,8 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
     if (fallbackPlan) {
       await emitAgentStep(state, "repair", "生成兜底方案", "succeeded", fallbackPlan.summary);
       return {
-        llmTrace: { provider: client.provider, fallback: true, errorCode: "REACT_LOOP_LIMIT" },
-        loopCount: MAX_REACT_LOOPS,
         toolTraces: traces,
         selectedPlan: fallbackPlan,
-        planValidation: {
-          isValid: true,
-          blockingIssues: [],
-          confidence: fallbackPlan.confidence,
-          reasonSummary: "ReAct loop reached the limit; fallback plan was composed from successful tool observations."
-        },
         messages: [
           message("user", state.userMessage, state.now),
           message("assistant", "工具多轮查询没有完全收敛，我先基于已查到的候选整理了一个可确认的兜底方案。", state.now)
@@ -570,8 +544,6 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
     }
 
     return {
-      llmTrace: { provider: client.provider, errorCode: "REACT_LOOP_LIMIT" },
-      loopCount: MAX_REACT_LOOPS,
       toolTraces: traces,
       messages: [
         message("user", state.userMessage, state.now),
@@ -585,13 +557,6 @@ export async function runReActPlanning(state: AgentGraphState): Promise<Partial<
     };
   } catch (error) {
     return {
-      llmTrace: {
-        provider: client.provider,
-        errorCode:
-          error && typeof error === "object" && "code" in error && typeof error.code === "string"
-            ? error.code
-            : "LLM_RUNTIME_ERROR"
-      },
       toolTraces: traces,
       messages: [
         message("user", state.userMessage, state.now),

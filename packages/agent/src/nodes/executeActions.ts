@@ -1,14 +1,14 @@
 import type { ExecutionReceipt, PlanAction } from "@mh/shared";
 import { toolFinishedDisplay, toolStartedDisplay } from "../display";
 import { createId, tracedToolCall } from "../helpers";
-import type { AgentGraphState } from "../state";
+import type { AgentRuntimeState } from "../state";
 
 function compact(value: unknown) {
   const text = typeof value === "string" ? value : JSON.stringify(value);
   return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
 
-async function emitToolStarted(state: AgentGraphState, id: string, action: PlanAction) {
+async function emitToolStarted(state: AgentRuntimeState, id: string, action: PlanAction) {
   if (!state.eventSink || !state.streamContext) {
     return;
   }
@@ -24,11 +24,11 @@ async function emitToolStarted(state: AgentGraphState, id: string, action: PlanA
 }
 
 async function emitToolFinished(
-  state: AgentGraphState,
+  state: AgentRuntimeState,
   id: string,
   action: PlanAction,
   output: unknown,
-  error?: AgentGraphState["error"]
+  error?: AgentRuntimeState["error"]
 ) {
   if (!state.eventSink || !state.streamContext) {
     return;
@@ -55,7 +55,7 @@ async function emitToolFinished(
   });
 }
 
-async function emitReceipt(state: AgentGraphState, receipt: ExecutionReceipt) {
+async function emitReceipt(state: AgentRuntimeState, receipt: ExecutionReceipt) {
   if (!state.eventSink || !state.streamContext) {
     return;
   }
@@ -78,7 +78,7 @@ async function emitReceipt(state: AgentGraphState, receipt: ExecutionReceipt) {
   });
 }
 
-export async function executeActions(state: AgentGraphState): Promise<Partial<AgentGraphState>> {
+export async function executeActions(state: AgentRuntimeState): Promise<Partial<AgentRuntimeState>> {
   if (!state.selectedPlan) {
     return {
       error: {
