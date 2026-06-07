@@ -9,6 +9,17 @@
 - 最终方案以 Markdown artifact 展示在右侧产物面板。
 - 结构化 `plan.updated` 和 `confirmation.required` 继续作为执行确认的数据源。
 
+## Hackathon Task
+
+任务目标：构建一个本地场景短时活动规划与执行 Agent。用户输入一句自然语言目标，Agent 自动完成意图理解、候选查询、路线和可用性校验、方案生成，并在用户确认后执行关键 mock 动作，例如预约活动、预订餐厅、安排配送或发送消息。
+
+当前交付形态：
+
+- Demo：`apps/web` 提供 Web UI，`POST /api/chat` 通过 SSE 返回规划进展、方案文档、确认请求和执行回执。
+- Tool 实现：`packages/core/src/tools` 注册完整 Tool，`packages/core/src/data` 提供活动、餐厅、商品、用户画像等 Mock API 数据。
+- PRD：[飞书 Wiki](https://my.feishu.cn/wiki/A5wuwi7ariWiWAkE9RGcfCrQnch)。
+- 设计文档：[docs/local-activity-agent-technical-design.md](docs/local-activity-agent-technical-design.md) 说明 Planning 策略、工具调用链路和异常处理机制。
+
 ## Quick Start
 
 ```bash
@@ -67,6 +78,8 @@ packages/
     src/shared/            Zod schemas and event contracts
 docs/
   architecture.md          System diagrams, stream flow, extension points
+  local-activity-agent-technical-design.md
+                           Hackathon technical design and delivery notes
 openspec/
   changes/                 Active OpenSpec change specs and tasks
 ```
@@ -147,6 +160,26 @@ The agent keeps a ReAct loop, but runtime guardrails force convergence:
 - Execution tools are blocked during planning and only run after confirmation.
 
 See [docs/architecture.md](docs/architecture.md) for diagrams and extension notes.
+
+## Tool & Mock API Chain
+
+Planning tools collect facts only:
+
+- `getUserProfile`
+- `searchNearbyActivities`
+- `searchRestaurants`
+- `estimateTravelTime`
+- `checkActivityAvailability`
+- `checkRestaurantAvailability`
+- `checkQueueTime`
+- `searchAddOnProducts`
+
+Execution tools run only after confirmation:
+
+- `bookActivity`
+- `reserveRestaurant`
+- `scheduleDelivery`
+- `sendMessage`
 
 ## Current Limitations
 
