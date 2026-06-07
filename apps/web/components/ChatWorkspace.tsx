@@ -11,13 +11,16 @@ import {
   Clock3,
   Download,
   FileText,
+  ListChecks,
   Loader2,
+  MapPin,
   MessageSquare,
   MoreHorizontal,
   PanelRightClose,
   PanelRightOpen,
   Plus,
   ReceiptText,
+  Route,
   Settings,
   Sparkles,
   Trash2,
@@ -25,7 +28,7 @@ import {
   Wrench,
   X
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { applyClientEvent, type ClientThread, createEmptyThread } from "../lib/chatState";
@@ -71,6 +74,8 @@ function receiptLabel(type: string) {
 }
 
 type ArtifactTab = "document" | "plan" | "confirmation" | "receipts" | "diagnostics";
+type WorkspaceView = "chat" | "plan";
+type ArtifactJumpTarget = "top" | "timeline";
 
 function artifactLabel(tab: ArtifactTab) {
   const labels: Record<ArtifactTab, string> = {
@@ -81,6 +86,18 @@ function artifactLabel(tab: ArtifactTab) {
     diagnostics: "诊断"
   };
   return labels[tab];
+}
+
+function artifactIcon(tab: ArtifactTab) {
+  const iconProps = { size: 14, strokeWidth: 2.1 };
+  const icons: Record<ArtifactTab, ReactNode> = {
+    document: <FileText {...iconProps} />,
+    plan: <Route {...iconProps} />,
+    confirmation: <CalendarCheck {...iconProps} />,
+    receipts: <ReceiptText {...iconProps} />,
+    diagnostics: <AlertTriangle {...iconProps} />
+  };
+  return icons[tab];
 }
 
 function toolStatusText(status: string) {
@@ -153,7 +170,7 @@ function RunActivityPanel({
   openArtifact
 }: {
   thread: ClientThread;
-  openArtifact: (tab: ArtifactTab) => void;
+  openArtifact: (tab: ArtifactTab, target?: ArtifactJumpTarget) => void;
 }) {
   const hiddenCount = Math.max(0, thread.steps.length - 6);
   const visibleSteps = thread.steps.slice(-6);
@@ -226,7 +243,9 @@ function RunActivityPanel({
             variant="outline"
             size="sm"
             type="button"
-            onClick={() => openArtifact(selectedArtifact(thread) ?? "plan")}
+            onClick={() =>
+              openArtifact(thread.artifacts.length > 0 ? "document" : (selectedArtifact(thread) ?? "plan"), "timeline")
+            }
           >
             <PanelRightOpen size={15} />
             查看产物
@@ -234,6 +253,72 @@ function RunActivityPanel({
         </div>
       )}
     </div>
+  );
+}
+
+function PlanWorkspace({
+  thread,
+  selected,
+  composer,
+  onSelect,
+  onBack,
+  onConfirm,
+  onRevise
+}: {
+  thread: ClientThread;
+  selected?: ArtifactTab;
+  composer: ReactNode;
+  onSelect: (tab: ArtifactTab) => void;
+  onBack: () => void;
+  onConfirm: () => void;
+  onRevise: () => void;
+}) {
+  const tabs = availableArtifactTabs(thread);
+  const active = selected ?? tabs[0];
+  const title = thread.plan?.title ?? activeMarkdownArtifact(thread)?.title ?? "方案详情";
+
+  if (!active) {
+    return (
+      <section className="plan-workspace empty" aria-label="方案详情">
+        <div className="plan-empty-state">
+          <Route size={24} />
+          <h2>方案会出现在这里</h2>
+          <p>先在对话里告诉我你想怎么安排，生成方案后这里会展示完整行程、确认项和执行回执。</p>
+          <Button type="button" variant="outline" onClick={onBack}>
+            <MessageSquare size={15} />
+            回到对话
+          </Button>
+        </div>
+        <div className="plan-workspace-composer">{composer}</div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="plan-workspace" aria-label="方案详情">
+      <div className="plan-workspace-shell">
+        <header className="plan-workspace-header">
+          <div>
+            <span className="artifact-kicker">方案中心</span>
+            <h2>{title}</h2>
+            <p>查看完整方案、时间线、确认项和执行后的回执。</p>
+          </div>
+          <Button type="button" variant="outline" onClick={onBack}>
+            <MessageSquare size={15} />
+            回到对话
+          </Button>
+        </header>
+        <ArtifactPanel
+          thread={thread}
+          selected={active}
+          onSelect={onSelect}
+          onClose={onBack}
+          onConfirm={onConfirm}
+          onRevise={onRevise}
+        />
+        <div className="plan-workspace-composer">{composer}</div>
+      </div>
+    </section>
   );
 }
 
@@ -254,6 +339,9 @@ function ArtifactPanel({
 }) {
   const tabs = availableArtifactTabs(thread);
   const active = selected ?? tabs[0];
+  const markdownArtifact = activeMarkdownArtifact(thread);
+  const documentState = markdownArtifact?.status === "final" ? "已完成" : thread.confirmation ? "待确认" : "草稿";
+  const documentStateClass = markdownArtifact?.status === "final" ? "final" : thread.confirmation ? "pending" : "draft";
 
   if (!active) {
     return null;
@@ -281,28 +369,60 @@ function ArtifactPanel({
             aria-selected={tab === active}
             onClick={() => onSelect(tab)}
           >
+            {artifactIcon(tab)}
             {artifactLabel(tab)}
           </button>
         ))}
       </div>
 
       <div className="artifact-panel-body">
-        {active === "document" && activeMarkdownArtifact(thread) && (
+        {active === "document" && markdownArtifact && (
           <section className="artifact-section document-section">
-            <div className="document-header">
-              <div>
-                <span className="artifact-kicker">
-                  {activeMarkdownArtifact(thread)?.status === "final" ? "最终文档" : "方案文档"}
+            <div className="document-hero">
+              <div className="document-title-row">
+                <span className="document-icon">
+                  <FileText size={18} />
                 </span>
-                <h3>{activeMarkdownArtifact(thread)?.title}</h3>
+                <div>
+                  <span className="artifact-kicker">
+                    {markdownArtifact.status === "final" ? "最终文档" : "方案文档"}
+                  </span>
+                  <h3>{markdownArtifact.title}</h3>
+                </div>
               </div>
-              <strong>{activeMarkdownArtifact(thread)?.status === "final" ? "final" : "draft"}</strong>
+              <strong className={`document-status ${documentStateClass}`}>{documentState}</strong>
             </div>
+            {thread.plan && (
+              <div className="document-snapshot">
+                <span>
+                  <Clock3 size={15} />
+                  {Math.round(thread.plan.totalDurationMinutes / 60)} 小时
+                </span>
+                <span>
+                  <Utensils size={15} />
+                  {thread.plan.estimatedBudgetCny} 元
+                </span>
+                <span>
+                  <Sparkles size={15} />
+                  {Math.round(thread.plan.confidence * 100)}%
+                </span>
+              </div>
+            )}
             {thread.confirmation && (
               <div className="document-actions">
-                <div>
-                  <strong>等待确认</strong>
-                  <span>{thread.confirmation.summary}</span>
+                <div className="document-actions-copy">
+                  <span className="document-actions-icon">
+                    <ListChecks size={18} />
+                  </span>
+                  <div>
+                    <strong>等待确认</strong>
+                    <span>{thread.confirmation.summary}</span>
+                  </div>
+                </div>
+                <div className="action-list compact">
+                  {thread.confirmation.actions.map((action) => (
+                    <span key={action.id}>{actionLabel(action.type)}</span>
+                  ))}
                 </div>
                 <div className="confirmation-actions compact">
                   <Button type="button" onClick={onConfirm}>
@@ -316,7 +436,7 @@ function ArtifactPanel({
               </div>
             )}
             <div className="markdown-document">
-              <Streamdown>{activeMarkdownArtifact(thread)?.content ?? ""}</Streamdown>
+              <Streamdown>{markdownArtifact.content}</Streamdown>
             </div>
           </section>
         )}
@@ -343,7 +463,10 @@ function ArtifactPanel({
                   </time>
                   <div>
                     <strong>{step.title}</strong>
-                    <span>{step.placeName ?? step.address ?? step.type}</span>
+                    <span>
+                      <MapPin size={12} />
+                      {step.placeName ?? step.address ?? step.type}
+                    </span>
                   </div>
                 </li>
               ))}
@@ -445,6 +568,8 @@ export function ChatWorkspace() {
   });
   const [input, setInput] = useState(familyPrompt);
   const [isStreaming, setStreaming] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("chat");
+  const [artifactJumpTarget, setArtifactJumpTarget] = useState<ArtifactJumpTarget>("top");
   const currentRequestRef = useRef<AbortController | null>(null);
 
   const activeThread = threads[activeThreadId] ?? createEmptyThread(activeThreadId);
@@ -452,12 +577,43 @@ export function ChatWorkspace() {
     (thread) => !isDraftThread(thread.id) || thread.messages.length > 0
   );
   const canSend = input.trim().length > 0 && !isStreaming;
+  const artifactVersion = `${activeThread.activeArtifactId ?? "none"}:${activeThread.artifacts.length}`;
+
+  useEffect(() => {
+    if (workspaceView !== "plan") return;
+    if (!artifactVersion) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const container = document.querySelector<HTMLElement>(".plan-workspace .artifact-panel-body");
+      if (!container) return;
+
+      if (artifactJumpTarget === "top") {
+        container.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      const timelineHeading = Array.from(container.querySelectorAll<HTMLElement>(".markdown-document h2")).find(
+        (heading) => heading.textContent?.includes("时间线")
+      );
+      if (!timelineHeading) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const headingRect = timelineHeading.getBoundingClientRect();
+      container.scrollTo({
+        top: container.scrollTop + headingRect.top - containerRect.top - 12,
+        behavior: "smooth"
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [workspaceView, artifactJumpTarget, artifactVersion]);
 
   function startNewChat() {
     const id = createDraftId();
     setActiveThreadId(id);
     setThreads((prev) => ({ ...prev, [id]: createEmptyThread(id) }));
     setInput(familyPrompt);
+    setWorkspaceView("chat");
   }
 
   function removeThread(id: string) {
@@ -496,6 +652,7 @@ export function ChatWorkspace() {
     const requestThreadId = isDraftThread(activeThreadId) ? undefined : activeThreadId;
     let currentKey = activeThreadId;
     const now = new Date().toISOString();
+    setWorkspaceView("chat");
     setStreaming(true);
     setInput("");
 
@@ -590,9 +747,73 @@ export function ChatWorkspace() {
     });
   }
 
+  function openPlanView(selected?: ArtifactTab, target: ArtifactJumpTarget = "top") {
+    setArtifactJumpTarget(target);
+    setWorkspaceView("plan");
+    setArtifactPanel(false, selected ?? activeArtifact ?? "document");
+  }
+
+  function revisePlan() {
+    setInput("我想调整一下：");
+    setWorkspaceView("chat");
+    setArtifactPanel(false);
+  }
+
   const activeArtifact = selectedArtifact(activeThread);
   const artifactTabs = availableArtifactTabs(activeThread);
-  const showArtifactPanel = activeThread.artifactPanel.open && Boolean(activeArtifact);
+  const showArtifactPanel = workspaceView === "chat" && activeThread.artifactPanel.open && Boolean(activeArtifact);
+  const workspaceContentClassName =
+    workspaceView === "plan"
+      ? "workspace-content plan-mode"
+      : showArtifactPanel
+        ? "workspace-content with-artifact"
+        : "workspace-content";
+  const composer = (
+    <form
+      className="composer-wrap"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void sendMessage();
+      }}
+    >
+      <div className="composer">
+        <textarea
+          value={input}
+          placeholder="今天我能为你做些什么？"
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void sendMessage();
+            }
+          }}
+        />
+        <div className="composer-footer">
+          <div className="composer-tools">
+            <button type="button" onClick={() => setInput(familyPrompt)}>
+              亲子
+            </button>
+            <button type="button" onClick={() => setInput(friendsPrompt)}>
+              朋友
+            </button>
+            <span>
+              <Utensils size={13} />
+              Pro
+            </span>
+          </div>
+          {isStreaming ? (
+            <Button type="button" size="icon" variant="outline" aria-label="停止" onClick={stopStreaming}>
+              <X size={16} />
+            </Button>
+          ) : (
+            <Button type="submit" size="icon" aria-label="发送" disabled={!canSend}>
+              {isStreaming ? <Loader2 className="spin" size={16} /> : <ArrowUp size={16} />}
+            </Button>
+          )}
+        </div>
+      </div>
+    </form>
+  );
 
   return (
     <>
@@ -614,9 +835,21 @@ export function ChatWorkspace() {
               <Plus size={16} />
               新对话
             </Button>
-            <button className="sidebar-nav active" type="button">
+            <button
+              className={workspaceView === "chat" ? "sidebar-nav active" : "sidebar-nav"}
+              type="button"
+              onClick={() => setWorkspaceView("chat")}
+            >
               <MessageSquare size={16} />
               对话
+            </button>
+            <button
+              className={workspaceView === "plan" ? "sidebar-nav active" : "sidebar-nav"}
+              type="button"
+              onClick={() => openPlanView(activeArtifact, "top")}
+            >
+              <Route size={16} />
+              方案
             </button>
             <button className="sidebar-nav" type="button">
               <Bot size={16} />
@@ -667,7 +900,7 @@ export function ChatWorkspace() {
                 size="sm"
                 type="button"
                 disabled={artifactTabs.length === 0}
-                onClick={() => setArtifactPanel(!showArtifactPanel, activeArtifact)}
+                onClick={() => openPlanView(activeArtifact, "top")}
               >
                 <FileText size={15} />
                 产物
@@ -675,97 +908,68 @@ export function ChatWorkspace() {
             </div>
           </header>
 
-          <div className={showArtifactPanel ? "workspace-content with-artifact" : "workspace-content"}>
-            <div className="chat-column">
-              <section className="conversation">
-                {activeThread.messages.length === 0 ? (
-                  <div className="welcome-state">
-                    <Sparkles size={24} />
-                    <h2>今天下午想怎么安排？</h2>
-                    <div className="suggestions">
-                      <button type="button" onClick={() => void sendMessage(familyPrompt)}>
-                        家庭亲子半日
-                      </button>
-                      <button type="button" onClick={() => void sendMessage(friendsPrompt)}>
-                        四人朋友局
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="message-stack">
-                    {activeThread.messages.map((message) => (
-                      <article className={`message ${message.role}`} key={message.id}>
-                        <div className="message-content">{message.content}</div>
-                      </article>
-                    ))}
-
-                    {(activeThread.steps.length > 0 ||
-                      activeThread.plan ||
-                      activeThread.receipts.length > 0 ||
-                      activeThread.failure) && (
-                      <article className="message assistant">
-                        <RunActivityPanel thread={activeThread} openArtifact={(tab) => setArtifactPanel(true, tab)} />
-                      </article>
-                    )}
-                  </div>
-                )}
-              </section>
-
-              <form
-                className="composer-wrap"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void sendMessage();
-                }}
-              >
-                <div className="composer">
-                  <textarea
-                    value={input}
-                    placeholder="今天我能为你做些什么？"
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        void sendMessage();
-                      }
-                    }}
-                  />
-                  <div className="composer-footer">
-                    <div className="composer-tools">
-                      <button type="button" onClick={() => setInput(familyPrompt)}>
-                        亲子
-                      </button>
-                      <button type="button" onClick={() => setInput(friendsPrompt)}>
-                        朋友
-                      </button>
-                      <span>
-                        <Utensils size={13} />
-                        Pro
-                      </span>
-                    </div>
-                    {isStreaming ? (
-                      <Button type="button" size="icon" variant="outline" aria-label="停止" onClick={stopStreaming}>
-                        <X size={16} />
-                      </Button>
-                    ) : (
-                      <Button type="submit" size="icon" aria-label="发送" disabled={!canSend}>
-                        {isStreaming ? <Loader2 className="spin" size={16} /> : <ArrowUp size={16} />}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            {showArtifactPanel && (
-              <ArtifactPanel
+          <div className={workspaceContentClassName}>
+            {workspaceView === "plan" ? (
+              <PlanWorkspace
                 thread={activeThread}
                 selected={activeArtifact}
-                onSelect={(tab) => setArtifactPanel(true, tab)}
-                onClose={() => setArtifactPanel(false)}
+                composer={composer}
+                onSelect={(tab) => setArtifactPanel(false, tab)}
+                onBack={() => setWorkspaceView("chat")}
                 onConfirm={() => void sendMessage("确认，就按这个安排")}
-                onRevise={() => setInput("我想调整一下：")}
+                onRevise={revisePlan}
               />
+            ) : (
+              <>
+                <div className="chat-column">
+                  <section className="conversation">
+                    {activeThread.messages.length === 0 ? (
+                      <div className="welcome-state">
+                        <Sparkles size={24} />
+                        <h2>今天下午想怎么安排？</h2>
+                        <div className="suggestions">
+                          <button type="button" onClick={() => void sendMessage(familyPrompt)}>
+                            家庭亲子半日
+                          </button>
+                          <button type="button" onClick={() => void sendMessage(friendsPrompt)}>
+                            四人朋友局
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="message-stack">
+                        {activeThread.messages.map((message) => (
+                          <article className={`message ${message.role}`} key={message.id}>
+                            <div className="message-content">{message.content}</div>
+                          </article>
+                        ))}
+
+                        {(activeThread.steps.length > 0 ||
+                          activeThread.plan ||
+                          activeThread.receipts.length > 0 ||
+                          activeThread.failure) && (
+                          <article className="message assistant">
+                            <RunActivityPanel thread={activeThread} openArtifact={openPlanView} />
+                          </article>
+                        )}
+                      </div>
+                    )}
+                  </section>
+
+                  {composer}
+                </div>
+
+                {showArtifactPanel && (
+                  <ArtifactPanel
+                    thread={activeThread}
+                    selected={activeArtifact}
+                    onSelect={(tab) => setArtifactPanel(true, tab)}
+                    onClose={() => setArtifactPanel(false)}
+                    onConfirm={() => void sendMessage("确认，就按这个安排")}
+                    onRevise={revisePlan}
+                  />
+                )}
+              </>
             )}
           </div>
         </main>
